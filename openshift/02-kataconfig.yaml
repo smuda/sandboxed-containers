@@ -1,0 +1,9 @@
+apiVersion: kataconfiguration.openshift.io/v1
+kind: KataConfig
+metadata:
+  name: example-kataconfig
+spec:
+  # true requires the Node Feature Discovery operator; not needed here.
+  checkNodeEligibility: false
+  enablePeerPods: false
+  logLevel: info

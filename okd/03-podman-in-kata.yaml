@@ -1,0 +1,81 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kata-test
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: podman
+  namespace: kata-test
+automountServiceAccountToken: false
+---
+# Lets any pod using SA podman in kata-test run privileged, including
+# a runc pod with hostPath volumes. Nothing limits it to kata. The
+# privileged pod below is only contained in the guest VM because it
+# sets runtimeClassName: kata.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: podman-privileged-scc
+  namespace: kata-test
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:privileged
+subjects:
+  - kind: ServiceAccount
+    name: podman
+    namespace: kata-test
+---
+# The image default uses fuse-overlayfs and an imagestore on the
+# container rootfs. In kata the rootfs is virtio-fs, which cannot back
+# overlay, and /dev/fuse is not passed into the guest. Keep all storage
+# on the tmpfs volume below so native overlay works.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: podman-storage-conf
+  namespace: kata-test
+data:
+  storage.conf: |
+    [storage]
+    driver = "overlay"
+    runroot = "/run/containers/storage"
+    graphroot = "/var/lib/containers/storage"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: podman-in-kata
+  namespace: kata-test
+  annotations:
+    # Admit via the SA's binding, not the creating user's SCCs.
+    openshift.io/required-scc: privileged
+spec:
+  runtimeClassName: kata
+  serviceAccountName: podman
+  automountServiceAccountToken: false
+  containers:
+    - name: podman
+      image: quay.io/podman/stable:latest
+      command: ["sleep", "infinity"]
+      securityContext:
+        privileged: true
+      resources:
+        limits:
+          memory: 2Gi
+      volumeMounts:
+        - name: containers-storage
+          mountPath: /var/lib/containers
+        - name: storage-conf
+          mountPath: /etc/containers/storage.conf
+          subPath: storage.conf
+  volumes:
+    - name: containers-storage
+      emptyDir:
+        medium: Memory
+        sizeLimit: 1Gi
+    - name: storage-conf
+      configMap:
+        name: podman-storage-conf

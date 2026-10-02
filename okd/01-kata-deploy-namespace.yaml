@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kata-deploy
+---
+# The DaemonSet's init container is privileged and mounts host paths.
+# The post-delete cleanup job (SA kata-deploy-sa-cleanup) only runs
+# kubectl unprivileged, so restricted-v2 covers it.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kata-deploy-privileged-scc
+  namespace: kata-deploy
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:privileged
+subjects:
+  - kind: ServiceAccount
+    name: kata-deploy-sa
+    namespace: kata-deploy

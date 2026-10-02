@@ -1,0 +1,23 @@
+{
+  "autoMode": {
+    "environment": [
+      "$defaults",
+      "Repository visibility: PUBLIC on GitHub (smuda/sandboxed-containers). Anything committed or pushed is world-readable.",
+      "Trusted repo: /Users/john/Projects/smuda/sandboxed-containers, remote https://github.com/smuda/sandboxed-containers.git.",
+      "Sensitive data: the kubeconfig (~/.kube/config, cluster-admin credentials for the lab cluster) and any tokens, pull secrets or certificates read from the cluster. None of these may be written into the repo, commit messages or terminal output.",
+      "Routine commands: oc and kubectl against the lab cluster api.okd4.example.com:6443 (apply/delete manifests, oc debug node, oc exec, crictl on nodes, podman inside test pods), git, gh, and editing Markdown/YAML in this repo.",
+      "CI/CD deploy targets: none."
+    ],
+    "allow": [
+      "$defaults",
+      "Any oc/kubectl operation against the lab cluster api.okd4.example.com, including destructive ones (deleting namespaces, operators, KataConfig, MachineConfigs, rebooting or draining nodes). The user has authorized destructive tests on this lab cluster."
+    ]
+  },
+  "sandbox": {
+    "network": {
+      "allowedDomains": [
+        "*.okd4.example.com"
+      ]
+    }
+  }
+}

@@ -1,0 +1,11 @@
+; kata-deploy 4.2.0 policy-revision 1 grants create/write but not
+; append on CRI config files. The CRI-O drop-in writer opens
+; 99-kata-deploy with O_APPEND, so without this rule kata-deploy fails
+; with "Permission denied (os error 13)" (AVC denied { append }
+; kata_deploy_t -> container_config_t).
+;
+; The types come from the chart's kata-deploy module. The optional
+; block disables the rule instead of failing the whole policy build
+; when they are gone (chart module removed, or renamed in an upgrade).
+(optional kata_deploy_crio_append
+  (allow kata_deploy_cri_config_writer kata_deploy_cri_config_target (file (append))))

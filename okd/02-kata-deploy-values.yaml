@@ -1,0 +1,29 @@
+# Values for oci://ghcr.io/kata-containers/kata-deploy-charts/kata-deploy
+# version 4.2.0, installed into namespace kata-deploy.
+
+# Loads kata-deploy's SELinux policy module so the installer stages run
+# confined on enforcing CoreOS nodes.
+selinux:
+  enabled: true
+
+# nydus/erofs snapshotters are containerd-only; OKD runs CRI-O.
+snapshotter:
+  setup: []
+
+# Rust runtime, the default since Kata 4.0. The Go shim "qemu" is
+# being deprecated upstream.
+shims:
+  disableAll: true
+  qemu-runtime-rs:
+    enabled: true
+
+defaultShim:
+  amd64: qemu-runtime-rs
+
+# RuntimeClass "kata" pointing at the default shim, next to
+# "kata-qemu-runtime-rs".
+runtimeClasses:
+  createDefault: true
+
+nodeSelector:
+  node-role.kubernetes.io/worker: ""

@@ -80,15 +80,37 @@ still charged 1292 MiB to the pod. With no balloon and
 `reclaim_guest_freed_memory = false`, nothing tells the host the
 pages are free.
 
+### Overhead
+
+The workload is `sleep infinity`, so nearly all idle usage is kata
+overhead. Split of the idle numbers above:
+
+| Part | MiB | Derived from |
+|-|-|-|
+| Guest RAM touched (guest kernel, agent, systemd) | 180 | qemu `RssShmem` |
+| qemu itself (anon, binary, guest image mapping) | 146 | `VmRSS` 326 minus shmem 180 |
+| Rest of the cgroup (virtiofsd x2, shim, page cache) | 157 | `memory.current` 483 minus `VmRSS` 326 |
+| Total at idle | 483 | |
+
+- Fixed overhead is about 300 MiB per pod (guest OS plus qemu), or
+  about 480 MiB counting everything in the cgroup. The RuntimeClass
+  declares 320Mi.
+- Marginal overhead is about 1%: 800 MiB written in the guest raised
+  `memory.current` by 809 MiB.
+- Caveats: one pod, one sample. `memory.current` includes
+  reclaimable page cache, so the 157 MiB is an upper bound. No runc
+  pod was measured for comparison, and CPU overhead (250m declared)
+  was not measured.
+
 ### Consequences
 
 - Scheduling uses the limit plus overhead (2368 MiB here), not
   actual use.
 - A long-running pod settles at its peak usage, not its current
   usage. Restarting the pod is the only way to release it.
-- Not tested: if the guest touches all 2080M, qemu and virtiofsd
-  overhead may push the pod cgroup past 2368 MiB, and the host OOM
-  killer would kill the whole VM.
+- Not tested: if the guest touches all 2080M, adding the roughly
+  300 MiB of non-RAM overhead gives about 2380 MiB, past the pod
+  cgroup's 2368 MiB, and the host OOM killer would kill the whole VM.
 
 ## 2. How does networking work inside the pod?
 

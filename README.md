@@ -21,6 +21,7 @@ in the matching directory.
 | Enabled by | KataConfig, MachineConfig extension, one reboot per worker | DaemonSet, CRI-O drop-in, no reboot |
 | RuntimeClass | `kata` | `kata` (handler `kata-qemu-runtime-rs`) |
 | Podman in kata | Works | Works |
+| Kata enforced in test namespace | No | ValidatingAdmissionPolicy |
 | Workarounds | None | One-rule SELinux module for CRI-O, as a MachineConfig (no reboot) |
 
 ## Why OKD doesn't use the operator
@@ -45,7 +46,11 @@ Both runs use the same pod setup
 [okd](okd/05-podman-in-kata.yaml)). It needs:
 
 - `privileged: true`, which in kata applies inside the guest VM, not
-  on the host node
+  on the host node. The SCC binding alone doesn't require kata; on OKD
+  a ValidatingAdmissionPolicy
+  ([okd/02-require-kata.yaml](okd/02-require-kata.yaml)) denies pods
+  in `kata-test` without `runtimeClassName: kata`, so the privilege
+  can't be used by a runc pod on the host
 - an `emptyDir` with `medium: Memory` at `/var/lib/containers`,
   because the container rootfs in the guest is virtio-fs, which
   overlay can't use

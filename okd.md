@@ -275,6 +275,15 @@ drop-in writer opens the file with `O_WRONLY|O_CREAT|O_APPEND`
 (syscall flags `0x88441`). The `/opt/kata` rule does include `append`,
 so only the CRI config path is affected.
 
+The writer is `configure_crio()` in
+`tools/packaging/kata-deploy/binary/src/runtime/crio.rs`. Line 128
+recreates `99-kata-deploy` empty with `fs::File::create` (allowed),
+then lines 135-138 reopen it with `OpenOptions::new().create(true)
+.append(true)` to write the `[crio]` header, which is the denied open.
+That is why the file is left at 0 bytes. The per-shim, custom runtime
+and debug writers (lines 76-79, 112-115, 168-171) open the same way.
+Line numbers are from main at `645e1f6` (`VERSION` 4.2.0).
+
 It only shows with CRI-O on enforcing nodes, and upstream CI never
 covers that combination (checked 2026-10-02):
 

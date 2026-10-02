@@ -1,0 +1,18 @@
+# Merge patch for machineconfiguration/cluster: changes to the
+# kata-deploy-crio-append MachineConfig restart its unit instead of
+# rebooting the workers.
+spec:
+  nodeDisruptionPolicy:
+    files:
+      - path: /etc/kata-deploy-selinux/kata-deploy-crio-append.cil
+        actions:
+          - type: Restart
+            restart:
+              serviceName: kata-deploy-crio-append.service
+    units:
+      - name: kata-deploy-crio-append.service
+        actions:
+          - type: DaemonReload
+          - type: Restart
+            restart:
+              serviceName: kata-deploy-crio-append.service

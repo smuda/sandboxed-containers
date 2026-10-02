@@ -21,7 +21,7 @@ in the matching directory.
 | Enabled by | KataConfig, MachineConfig extension, one reboot per worker | DaemonSet, CRI-O drop-in, no reboot |
 | RuntimeClass | `kata` | `kata` (handler `kata-qemu-runtime-rs`) |
 | Podman in kata | Works | Works |
-| Workarounds | None | One-rule SELinux module for CRI-O |
+| Workarounds | None | One-rule SELinux module for CRI-O, as a MachineConfig (no reboot) |
 
 ## Why OKD doesn't use the operator
 
@@ -35,14 +35,14 @@ and guest kernel into `/opt/kata` instead. Details are in section 2
 of [okd.md](okd.md).
 
 On OKD, kata-deploy 4.2.0's own SELinux policy lacks an `append`
-permission that the CRI-O config writer needs. Section 4 of
+permission that the CRI-O config writer needs. Section 3 of
 [okd.md](okd.md) has the fix; a draft upstream issue is near the end.
 
 ## Podman inside a kata pod
 
 Both runs use the same pod setup
 ([openshift](openshift/03-podman-in-kata.yaml),
-[okd](okd/03-podman-in-kata.yaml)). It needs:
+[okd](okd/05-podman-in-kata.yaml)). It needs:
 
 - `privileged: true`, which in kata applies inside the guest VM, not
   on the host node
@@ -55,7 +55,3 @@ Both runs use the same pod setup
 
 Each log ends with checks that prove the pod is in a VM: guest CPU
 count and kernel command line, and the qemu process on the node.
-
-## Other files
-
-- [prompt.md](prompt.md): the prompts used to drive the test runs

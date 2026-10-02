@@ -10,10 +10,10 @@ metadata:
   namespace: kata-test
 automountServiceAccountToken: false
 ---
-# Lets any pod using SA podman in kata-test run privileged, including
-# a runc pod with hostPath volumes. Nothing limits it to kata. The
-# privileged pod below is only contained in the guest VM because it
-# sets runtimeClassName: kata.
+# Lets any pod using SA podman in kata-test run privileged. The
+# binding itself doesn't limit it to kata; 02-require-kata.yaml denies
+# pods in kata-test without runtimeClassName: kata, so privileged stays
+# inside the guest VM.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:

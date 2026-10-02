@@ -1,0 +1,36 @@
+# Installs okd/01-kata-deploy-crio-append.cil on every worker and loads
+# it at priority 401 at boot, before CRI-O and kubelet. The data URL is
+# generated from the .cil file; see okd.md section 3 to regenerate it.
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  name: 99-worker-kata-deploy-crio-append
+  labels:
+    machineconfiguration.openshift.io/role: worker
+spec:
+  config:
+    ignition:
+      version: 3.5.0
+    storage:
+      files:
+        - path: /etc/kata-deploy-selinux/kata-deploy-crio-append.cil
+          mode: 0644
+          overwrite: true
+          contents:
+            source: data:text/plain;charset=utf-8;base64,OyBrYXRhLWRlcGxveSA0LjIuMCBwb2xpY3ktcmV2aXNpb24gMSBncmFudHMgY3JlYXRlL3dyaXRlIGJ1dCBub3QKOyBhcHBlbmQgb24gQ1JJIGNvbmZpZyBmaWxlcy4gVGhlIENSSS1PIGRyb3AtaW4gd3JpdGVyIG9wZW5zCjsgOTkta2F0YS1kZXBsb3kgd2l0aCBPX0FQUEVORCwgc28gd2l0aG91dCB0aGlzIHJ1bGUga2F0YS1kZXBsb3kgZmFpbHMKOyB3aXRoICJQZXJtaXNzaW9uIGRlbmllZCAob3MgZXJyb3IgMTMpIiAoQVZDIGRlbmllZCB7IGFwcGVuZCB9Cjsga2F0YV9kZXBsb3lfdCAtPiBjb250YWluZXJfY29uZmlnX3QpLgo7CjsgVGhlIHR5cGVzIGNvbWUgZnJvbSB0aGUgY2hhcnQncyBrYXRhLWRlcGxveSBtb2R1bGUuIFRoZSBvcHRpb25hbAo7IGJsb2NrIGRpc2FibGVzIHRoZSBydWxlIGluc3RlYWQgb2YgZmFpbGluZyB0aGUgd2hvbGUgcG9saWN5IGJ1aWxkCjsgd2hlbiB0aGV5IGFyZSBnb25lIChjaGFydCBtb2R1bGUgcmVtb3ZlZCwgb3IgcmVuYW1lZCBpbiBhbiB1cGdyYWRlKS4KKG9wdGlvbmFsIGthdGFfZGVwbG95X2NyaW9fYXBwZW5kCiAgKGFsbG93IGthdGFfZGVwbG95X2NyaV9jb25maWdfd3JpdGVyIGthdGFfZGVwbG95X2NyaV9jb25maWdfdGFyZ2V0IChmaWxlIChhcHBlbmQpKSkpCg==
+    systemd:
+      units:
+        - name: kata-deploy-crio-append.service
+          enabled: true
+          contents: |
+            [Unit]
+            Description=Load the kata-deploy CRI-O append SELinux module
+            Before=crio.service kubelet.service
+
+            [Service]
+            Type=oneshot
+            RemainAfterExit=yes
+            ExecStart=/bin/sh -c 'cmp -s /etc/kata-deploy-selinux/kata-deploy-crio-append.cil /var/lib/kata-deploy-selinux/loaded.cil || { semodule -X 401 -i /etc/kata-deploy-selinux/kata-deploy-crio-append.cil && mkdir -p /var/lib/kata-deploy-selinux && cp /etc/kata-deploy-selinux/kata-deploy-crio-append.cil /var/lib/kata-deploy-selinux/loaded.cil; }'
+
+            [Install]
+            WantedBy=multi-user.target

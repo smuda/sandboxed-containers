@@ -1,24 +1,31 @@
 # Kata Containers on OKD
 
-Test run 2026-10-01. Result: working, with one manual SELinux fix. A
-pod with `runtimeClassName: kata` runs inside a QEMU/KVM guest, and
-podman inside that pod pulls and runs nested containers.
+Test run 2026-10-01. Result: working, with one SELinux fix applied as
+a MachineConfig. A pod with `runtimeClassName: kata` runs inside a
+QEMU/KVM guest, and podman inside that pod pulls and runs nested
+containers.
 
 Progress:
 
-- Sections 1 to 7 done and verified on the lab cluster.
+- Sections 1 to 8 done and verified on the lab cluster.
 - A security review of `okd/` led to four fixes: the SELinux rule is
-  wrapped in an `optional` block, the module is copied to the nodes
-  base64-encoded instead of spliced into a shell, and the podman pod
-  gets no ServiceAccount token and is admitted through its own
-  `privileged` SCC binding. See Security notes.
-- Sections 3 and 4 have been run twice. While testing the docs, the
-  Cleanup commands (except `helm uninstall`) were run by mistake and
-  deleted both namespaces and the extra SELinux module. A reinstall
-  from sections 3 and 4 reproduced the `append` denial, and the
-  section 4 fix cleared it again.
+  wrapped in an `optional` block, the module ships base64-encoded
+  instead of spliced into a shell, and the podman pod gets no
+  ServiceAccount token and is admitted through its own `privileged`
+  SCC binding. See Security notes.
+- The kata-deploy install and the SELinux fix have been run twice.
+  While testing the docs, the Cleanup commands (except `helm
+  uninstall`) were run by mistake and deleted both namespaces and the
+  extra SELinux module. A reinstall reproduced the `append` denial,
+  and the fix cleared it again.
+- 2026-10-02: the SELinux fix moved from a manual `oc debug` loop to
+  a MachineConfig with a node disruption policy (section 3), applied
+  without a reboot. The files in `okd/` were renumbered to apply
+  order, security first.
 - Not done: no kata pod on worker1 (see Known issues), `helm
-  uninstall` never run, and the section 4 loop only run in zsh.
+  uninstall` never run, and the new order (MachineConfig and policy
+  before the namespaces and `helm install`) not yet run on a fresh
+  cluster.
 
 ## Environment
 
@@ -100,7 +107,7 @@ Kata Containers 4.2.0 (released 2026-09-15), chart
 statically built kata, qemu and guest kernel to `/opt/kata` (on CoreOS
 `/var/opt/kata`), writes the CRI-O drop-in
 `/etc/crio/crio.conf.d/99-kata-deploy`, restarts CRI-O and creates
-the RuntimeClasses. No RPMs, no reboot, no MachineConfig.
+the RuntimeClasses. No RPMs and no reboot.
 
 OKD-specific points:
 
@@ -110,43 +117,120 @@ OKD-specific points:
   the installer can run as `kata_deploy_t` on enforcing nodes.
 - kata-deploy doesn't relabel `/var/opt/kata`, so the qemu binary
   stays `usr_t` where policy expects `bin_t`. This turned out not to
-  matter: qemu still runs as `container_kvm_t` (section 6).
+  matter: qemu still runs as `container_kvm_t` (section 7).
 - The chart's SELinux module lacks an `append` rule, which breaks the
-  CRI-O drop-in write. Needs a one-rule fix (section 4).
+  CRI-O drop-in write. Needs a one-rule fix (section 3).
 
-## 3. Install kata-deploy
+## 3. Load the SELinux fix for CRI-O
 
-[`okd/01-kata-deploy-namespace.yaml`](okd/01-kata-deploy-namespace.yaml)
-creates the namespace and binds the `privileged` SCC to
-`kata-deploy-sa`.
-[`okd/02-kata-deploy-values.yaml`](okd/02-kata-deploy-values.yaml)
-holds the helm values:
+kata-deploy 4.2.0's SELinux module lacks an `append` rule that the
+CRI-O drop-in writer needs (see "Without the fix" below).
+[`okd/01-kata-deploy-crio-append.cil`](okd/01-kata-deploy-crio-append.cil)
+is a one-rule companion module and the source of truth.
 
-- `selinux.enabled: true`
-- `snapshotter.setup: []`, since nydus/erofs are containerd-only
-- only the `qemu-runtime-rs` shim, as default shim. The Go shim
-  `qemu` is being deprecated upstream.
-- `runtimeClasses.createDefault: true`, giving a RuntimeClass `kata`
-  next to `kata-qemu-runtime-rs`
-- `nodeSelector` on workers
+- [`okd/01-kata-deploy-crio-append-mc.yaml`](okd/01-kata-deploy-crio-append-mc.yaml)
+  is a MachineConfig that writes the module to
+  `/etc/kata-deploy-selinux/kata-deploy-crio-append.cil` on every
+  worker, plus a oneshot unit `kata-deploy-crio-append.service` that
+  loads it with `semodule -X 401 -i` before CRI-O and kubelet start.
+  After a load the unit copies the file to
+  `/var/lib/kata-deploy-selinux/loaded.cil`, and it skips the load
+  while the two match, so a normal boot costs no policy rebuild.
+  `semodule` names the module after the file, hence the fixed file
+  name.
+- [`okd/01-kata-deploy-crio-append-ndp.yaml`](okd/01-kata-deploy-crio-append-ndp.yaml)
+  is a node disruption policy: when the MachineConfig adds or changes
+  the file or the unit, the MCO restarts the unit instead of
+  rebooting the node.
 
-Make sure both MachineConfigPools are `Updated` first, or the nodes
-reboot under the install.
+Apply both first; they depend on nothing else. The rule sits in a CIL
+`optional` block, so the module loads before the chart's module
+exists and the rule switches on once kata-deploy's init container
+loads the chart's types (every `semodule` transaction rebuilds the
+whole policy). The same block drops the rule instead of failing every
+later `semodule` transaction if the types disappear again.
+
+The policy goes in first so the MachineConfig update doesn't reboot.
+The merge patch replaces `spec.nodeDisruptionPolicy.files` and
+`units` as whole lists; they were empty here. On a cluster that
+already has entries, add them to the file first.
 
 ```sh
-oc get mcp
-oc apply -f okd/01-kata-deploy-namespace.yaml
-helm install kata-deploy \
-  oci://ghcr.io/kata-containers/kata-deploy-charts/kata-deploy \
-  --version 4.2.0 -n kata-deploy -f okd/02-kata-deploy-values.yaml
-oc get pods -n kata-deploy -w
+oc patch machineconfiguration cluster --type=merge \
+  --patch-file okd/01-kata-deploy-crio-append-ndp.yaml
+oc get machineconfiguration cluster -o \
+  jsonpath='{.status.nodeDisruptionPolicyStatus.clusterPolicies.units[*].name}{"\n"}'
+oc apply -f okd/01-kata-deploy-crio-append-mc.yaml
+oc wait mcp/worker --for=condition=Updating=True --timeout=180s
+oc wait mcp/worker --for=condition=Updated=True --timeout=1200s
+for n in worker1 worker2; do
+  oc debug node/$n.okd4.example.com -q -- chroot /host sh -c '
+    systemctl is-active kata-deploy-crio-append
+    semodule -lfull | grep kata' 2>/dev/null
+done
 ```
 
-Without the fix in section 4 the pods crash-loop, so `--wait` is left
-out. Continue with section 4 once the pods show `CrashLoopBackOff`;
-by then the init container has loaded the chart's SELinux module.
+Observed: the status lists `kata-deploy-crio-append.service` next to
+the cluster's own `iri-registry.service`. The worker pool was
+`Updated` 51 s after the apply. Boot IDs were unchanged and no node
+was drained; each worker got these events instead:
 
-## 4. Fix the SELinux policy for CRI-O
+```
+ServiceReload   Config changes do not require reboot. Service daemon-reload was reloaded.
+ServiceRestart  Config changes do not require reboot. Service kata-deploy-crio-append.service was restarted.
+```
+
+The restart also started the new unit, so nothing else was needed.
+Per worker:
+
+```
+active
+401 kata-deploy                  cil
+401 kata-deploy-cri-config-etc_t cil
+401 kata-deploy-crio-append      cil
+```
+
+The chart was already installed on this run; on a fresh cluster only
+`kata-deploy-crio-append` is listed until section 5.
+
+After editing the `.cil` file, regenerate the data URL in the
+MachineConfig. On an unchanged file this leaves the MachineConfig as
+it is, so an empty `git diff` means the two are in sync:
+
+```sh
+sed -i.bak "s|base64,.*|base64,$(base64 < okd/01-kata-deploy-crio-append.cil | tr -d '\n')|" \
+  okd/01-kata-deploy-crio-append-mc.yaml &&
+  rm okd/01-kata-deploy-crio-append-mc.yaml.bak
+```
+
+Applying a changed MachineConfig should restart the unit through the
+node disruption policy, and the unit reloads the module because the
+file no longer matches its copy. Only the first apply has been
+tested.
+
+### Ordering and reboot checks
+
+Run on worker1 with the chart installed:
+
+- `semodule -X 401 -r kata-deploy-cri-config-etc_t kata-deploy`
+  succeeded and left `kata-deploy-crio-append` loaded on its own.
+  After deleting the kata-deploy pod, the new pod's init container
+  loaded the chart's modules again, and `kube-kata` wrote the 402
+  byte drop-in and ended with "Kata Containers installation completed
+  successfully", without restarts and without `kata_deploy` AVCs.
+  `sesearch` isn't on the node, so the active rule shows in behaviour
+  only. Don't remove the chart's module under a running pod: the old
+  pod's process dropped to `unlabeled_t`, ignored SIGTERM and was
+  only killed after its 600 s grace period.
+- After a reboot the unit ran before CRI-O, took 18 ms (load skipped,
+  copy matches), the module was still loaded and the kata-deploy pod
+  came back `1/1 Running` with no `kata_deploy` AVCs.
+
+Don't reboot a node with `oc debug ... -- chroot /host systemctl
+reboot`: the debug pod ran again after each boot until it was cleaned
+up, and worker1 rebooted four times in 14 minutes.
+
+### Without the fix
 
 The `selinux-policy` init container succeeds on both workers and loads
 the chart's module at priority 401:
@@ -177,6 +261,11 @@ scontext=system_u:system_r:kata_deploy_t:s0
 tcontext=system_u:object_r:container_config_t:s0 tclass=file
 ```
 
+Loading the module then and deleting the pods
+(`oc delete pod -n kata-deploy -l name=kata-deploy`) recovers. That
+was tested with the earlier manual `semodule` load, not with the
+MachineConfig.
+
 ### Why it fails
 
 The chart's module (`policy-revision: 1`, readable with `semodule -E
@@ -199,50 +288,72 @@ covers that combination (checked 2026-10-02):
 - No issue or PR covers it. The closest are #13751 (SELinux failure
   on RKE2) and #13777 (the PR adding the policy).
 
-### Fix
 
-[`okd/04-kata-deploy-crio-append.cil`](okd/04-kata-deploy-crio-append.cil)
-is a one-rule companion module. It uses types from the chart's module,
-so it can only be loaded after the init container has run once. Load
-it at the same priority on every worker, then restart the DaemonSet
-pods:
+## 4. Require kata in kata-test
+
+The `privileged` SCC binding for the podman pod (section 7) is only
+safe under kata, so the guard goes in before the grant.
+[`okd/02-require-kata.yaml`](okd/02-require-kata.yaml) is a
+ValidatingAdmissionPolicy that rejects any pod create or update in
+`kata-test` without `runtimeClassName: kata`. Its binding selects the
+namespace by label, so it can be applied before `kata-test` exists.
+
+The binding takes a few seconds to apply; the first attempts on the
+first run were still admitted. Test with a server-side dry run, so no
+runc pod is ever created, and loop until it is denied. The dry run
+needs the namespace, so create it here; section 7's manifest then
+adopts it (`oc apply` warns about the missing last-applied
+annotation, which is harmless):
 
 ```sh
-b=$(base64 < okd/04-kata-deploy-crio-append.cil | tr -d '\n')
-[ -n "$b" ] && for n in worker1 worker2; do
-  oc debug node/$n.okd4.example.com -q -- chroot /host sh -c "
-d=\$(mktemp -d) && f=\$d/kata-deploy-crio-append.cil &&
-echo $b | base64 -d > \$f && [ -s \$f ] && semodule -X 401 -i \$f
-rc=\$?; rm -rf \$d; semodule -lfull | grep kata; exit \$rc"
-done
-oc delete pod -n kata-deploy -l name=kata-deploy --wait=false
+oc apply -f okd/02-require-kata.yaml
+oc create namespace kata-test
+until out=$(oc run -n kata-test runc-test --image=quay.io/podman/hello \
+    --restart=Never --dry-run=server 2>&1); echo "$out" | grep -q 'denied request'; do
+  sleep 2
+done; echo "$out"
 ```
 
-The file goes over as base64, which has no shell metacharacters, so
-its content can't break out of the quoted command that runs as root on
-the node. `semodule` names the module after the file, hence the fixed
-file name in a temporary directory. Running the loop again replaces
-the module in place.
-
-Expected `semodule` output per worker:
-
 ```
-401 kata-deploy                  cil
-401 kata-deploy-cri-config-etc_t cil
-401 kata-deploy-crio-append      cil
+Error from server (Forbidden): pods "runc-test" is forbidden: ValidatingAdmissionPolicy 'require-kata-runtimeclass' with binding 'require-kata-runtimeclass-kata-test' denied request: pods in this namespace must use runtimeClassName: kata
 ```
 
-The module persists in the node's policy store across reboots, and
-the chart's own module reloads don't touch it because the name
-differs. The rule sits in a CIL `optional` block: if the chart's types
-disappear (module removed, or renamed by an upgrade) the rule is
-dropped instead of failing every later `semodule` transaction. Check
-what is loaded with `semodule -X 401 -E kata-deploy-crio-append` (run
-in a writable directory such as `/tmp`; it writes the `.cil` file
-there). A MachineConfig would also work but costs a reboot of every
-worker and has the same ordering problem.
+A pod with SA `podman`, `privileged: true` and no RuntimeClass gets
+the same denial. A kata pod is admitted, labelling the running
+`podman-in-kata` (an update) works, and pods in other namespaces are
+unaffected. The loop was run against an existing `kata-test`; applying
+the policy before the namespace exists has not been run.
 
-Both pods are `1/1 Running` within about 30 s. Their log
+## 5. Install kata-deploy
+
+[`okd/03-kata-deploy-namespace.yaml`](okd/03-kata-deploy-namespace.yaml)
+creates the namespace and binds the `privileged` SCC to
+`kata-deploy-sa`.
+[`okd/04-kata-deploy-values.yaml`](okd/04-kata-deploy-values.yaml)
+holds the helm values:
+
+- `selinux.enabled: true`
+- `snapshotter.setup: []`, since nydus/erofs are containerd-only
+- only the `qemu-runtime-rs` shim, as default shim. The Go shim
+  `qemu` is being deprecated upstream.
+- `runtimeClasses.createDefault: true`, giving a RuntimeClass `kata`
+  next to `kata-qemu-runtime-rs`
+- `nodeSelector` on workers
+
+Make sure both MachineConfigPools are `Updated` first, or the nodes
+reboot under the install.
+
+```sh
+oc get mcp
+oc apply -f okd/03-kata-deploy-namespace.yaml
+helm install kata-deploy \
+  oci://ghcr.io/kata-containers/kata-deploy-charts/kata-deploy \
+  --version 4.2.0 -n kata-deploy -f okd/04-kata-deploy-values.yaml
+oc get pods -n kata-deploy -w
+```
+
+With section 3 in place the pods should go straight to `1/1
+Running`; without it they crash-loop as described there. Their log
 (`oc logs -n kata-deploy ds/kata-deploy`) ends with:
 
 ```
@@ -253,11 +364,8 @@ Kata Containers installation completed successfully
 
 CRI-O restarts without making the nodes `NotReady`, and `ausearch -m
 AVC -ts recent | grep kata_deploy` on the workers comes back empty.
-Use `oc get pods -n kata-deploy` to check the restart: `oc wait -l
-name=kata-deploy` resolves the selector to the deleted pods and times
-out.
 
-## 5. Verify the install
+## 6. Verify the install
 
 ```sh
 helm list -n kata-deploy
@@ -308,9 +416,9 @@ kata-deploy also writes an empty `100-debug`. The kata files live in
 `/var/opt/kata` (`usr_t`) and `getenforce` stays `Enforcing`; no
 relabeling or `disable_selinux` is needed.
 
-## 6. Run podman inside a kata pod
+## 7. Run podman inside a kata pod
 
-[`okd/03-podman-in-kata.yaml`](okd/03-podman-in-kata.yaml) is based on
+[`okd/05-podman-in-kata.yaml`](okd/05-podman-in-kata.yaml) is based on
 [`openshift/03-podman-in-kata.yaml`](openshift/03-podman-in-kata.yaml):
 namespace `kata-test`, a ServiceAccount allowed to use the `privileged`
 SCC, a podman `storage.conf` and pod `podman-in-kata` with
@@ -326,7 +434,7 @@ under one of the admin's own SCCs (here it was
 let it in.
 
 ```sh
-oc apply -f okd/03-podman-in-kata.yaml
+oc apply -f okd/05-podman-in-kata.yaml
 oc wait -n kata-test pod/podman-in-kata --for=condition=Ready \
   --timeout=300s
 oc get pod -n kata-test podman-in-kata \
@@ -338,6 +446,8 @@ oc exec -n kata-test podman-in-kata -- podman run --rm \
   quay.io/centos/centos:stream10 cat /etc/os-release
 oc exec -n kata-test podman-in-kata -- podman info \
   --format '{{.Store.GraphDriverName}} {{.Host.Security.SELinuxEnabled}}'
+oc get pods -n kata-test \
+  -o custom-columns=NAME:.metadata.name,RC:.spec.runtimeClassName
 ```
 
 Observed output (trimmed). The pod was Ready after 13 s including the
@@ -352,6 +462,8 @@ ID="centos"
 VERSION_ID="10"
 PRETTY_NAME="CentOS Stream 10 (Coughlan)"
 overlay false
+NAME             RC
+podman-in-kata   kata
 ```
 
 ### Verify the pod really is in a VM
@@ -396,7 +508,7 @@ the binary is `usr_t`. The guest has `selinux=0` (kata guest default),
 so host-side confinement is what applies. The only AVCs from qemu are
 denied probes of `sgx_vepc` and `sgx_provision`, which are harmless.
 
-## 7. Unprivileged kata pods
+## 8. Unprivileged kata pods
 
 A plain `oc run` as cluster admin is admitted under SCC `anyuid`,
 because the creating user's SCCs count too. That is not a real test.
@@ -435,10 +547,18 @@ need no special SCC.
 ## Security notes
 
 - The `podman` RoleBinding is not limited to kata. Any pod using SA
-  `podman` in `kata-test` may be privileged, including a runc pod
-  with hostPath volumes. Privileged is only contained in the guest
-  because `podman-in-kata` sets `runtimeClassName: kata`. Enforcing
-  that would need e.g. a ValidatingAdmissionPolicy; not done here.
+  `podman` in `kata-test` may be privileged. The policy from section
+  4 makes every pod in `kata-test` use `runtimeClassName: kata`. That
+  keeps privileged in a guest VM only while RuntimeClass `kata`
+  points to a kata handler: anyone who can create or delete
+  RuntimeClasses, or run `helm upgrade` on kata-deploy, can undo it,
+  and so can anyone with write access to `validatingadmissionpolicies`
+  or `validatingadmissionpolicybindings`. The policy checks nothing
+  else: hostPath and other host access the `privileged` SCC allows
+  are still admitted. A hostPath in a kata pod is shared into the
+  guest over virtio-fs and is writable by privileged root in the
+  guest; host SELinux (`container_kvm_t` with per-pod MCS
+  categories) is then the remaining check.
 - The upstream chart's ClusterRole gives `kata-deploy-sa` `patch` on
   `nodes` and `get` on `nodes/proxy`, cluster-wide. `kube-kata` also
   mounts the host `/` and `/run/systemd/private`, which is
@@ -448,19 +568,19 @@ need no special SCC.
   job's `kubectl:latest` and `podman/stable:latest`. Fine for a dated
   lab log; pin digests for anything real.
 - `privileged_without_host_devices = true` in the CRI-O drop-in keeps
-  the host's `/dev` out of privileged kata pods. Section 5 checks it.
+  the host's `/dev` out of privileged kata pods. Section 6 checks it.
 - The guest kernel runs with `selinux=0`, so the boundary is the
   host-side confinement of the VMM: `container_kvm_t` with per-pod MCS
-  categories (section 6).
+  categories (section 7).
 
 ## Known issues
 
-- The SELinux fix in section 4 is manual and per node. A new worker
-  or a reinstalled one needs it again, after kata-deploy's init
-  container has run. If upstream bumps `policy-revision` and renames
-  the attributes, the `optional` block turns the rule off; that is
-  harmless and probably means the fix is no longer needed. Not yet
-  reported upstream; the fix there is adding `append` to the CRI
+- The SELinux fix in section 3 depends on the chart's attribute names
+  `kata_deploy_cri_config_writer` and `kata_deploy_cri_config_target`.
+  If an upgrade renames them, the `optional` block turns the rule off
+  silently; if `append` is still missing then, kata-deploy
+  crash-loops again with the AVC from section 3. Not yet reported
+  upstream; the fix there is adding `append` to the CRI
   config file rule in `kata-deploy.cil`. A draft issue is below.
 - worker1 has 4 CPUs (3500m allocatable, 96% requested), and the
   `kata` RuntimeClass adds 250m CPU and 320Mi memory overhead per pod,
@@ -531,23 +651,39 @@ handler, and kata pods run with SELinux enforcing (VMM as
 
 ## Cleanup
 
+Remove the grant before the guard: the podman manifest (with
+namespace `kata-test`) first, the policy last.
+
 ```sh
-oc delete -f okd/03-podman-in-kata.yaml
+oc delete -f okd/05-podman-in-kata.yaml
 helm uninstall kata-deploy -n kata-deploy
+oc delete -f okd/03-kata-deploy-namespace.yaml
+oc delete -f okd/01-kata-deploy-crio-append-mc.yaml
+oc wait mcp/worker --for=condition=Updated=True --timeout=1200s
 for n in worker1 worker2; do
-  oc debug node/$n.okd4.example.com -q -- chroot /host \
+  oc debug node/$n.okd4.example.com -q -- chroot /host sh -c '
     semodule -X 401 -r kata-deploy-crio-append
+    rm -rf /var/lib/kata-deploy-selinux'
 done
-oc delete namespace kata-deploy kata-test
+oc patch machineconfiguration cluster --type=json \
+  -p '[{"op":"remove","path":"/spec/nodeDisruptionPolicy"}]'
+oc delete -f okd/02-require-kata.yaml
 ```
+
+Deleting the MachineConfig removes the file and the unit but not the
+loaded module, hence the `semodule -r`. The copy in
+`/var/lib/kata-deploy-selinux` goes too, or a later reapply would
+skip the load. The JSON patch drops the whole node disruption policy,
+which held only these entries here. Whether deleting the
+MachineConfig reboots the workers despite the policy has not been
+tested.
 
 The chart's own modules (`kata-deploy`, `kata-deploy-cri-config-etc_t`)
 stay loaded after uninstall; remove them with `semodule -X 401 -r` if
-needed, after `kata-deploy-crio-append`. Whether the chart's
-uninstall also removes `/var/opt/kata` and
-the CRI-O drop-in has not been checked.
+needed. Whether the chart's uninstall also removes `/var/opt/kata`
+and the CRI-O drop-in has not been checked.
 
-Only part of this has been run: removing the extra module and
-deleting the namespaces (by mistake, see the top of this log). Both
-worked. `helm uninstall` and its post-delete cleanup Job have not been
-run.
+Only part of this has been run, in an older form: removing the extra
+module and deleting the namespaces (by mistake, see the top of this
+log). Both worked. `helm uninstall` and its post-delete cleanup Job,
+deleting the MachineConfig and removing the policy have not been run.

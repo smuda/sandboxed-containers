@@ -1,0 +1,32 @@
+# The privileged SCC binding in 05-podman-in-kata.yaml is only safe
+# under kata. Reject any pod in kata-test that would run under runc.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: require-kata-runtimeclass
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["pods"]
+  validations:
+    - expression: >-
+        has(object.spec.runtimeClassName) &&
+        object.spec.runtimeClassName == 'kata'
+      message: "pods in this namespace must use runtimeClassName: kata"
+      reason: Forbidden
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: require-kata-runtimeclass-kata-test
+spec:
+  policyName: require-kata-runtimeclass
+  validationActions: [Deny]
+  matchResources:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: kata-test

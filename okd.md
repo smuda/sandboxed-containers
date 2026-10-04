@@ -22,10 +22,14 @@ Progress:
   a MachineConfig with a node disruption policy (section 3), applied
   without a reboot. The files in `okd/` were renumbered to apply
   order, security first.
-- Not done: no kata pod on worker1 (see Known issues), `helm
-  uninstall` never run, and the new order (MachineConfig and policy
-  before the namespaces and `helm install`) not yet run on a fresh
-  cluster.
+- 2026-10-04: sections 1 to 8 run in order on a newly installed
+  cluster with no earlier kata install (no kata SELinux modules, no
+  `/var/opt/kata`, no kata namespaces or RuntimeClasses). Everything
+  worked on the first try: no reboot for the MachineConfig, and the
+  kata-deploy pods went straight to `1/1 Running` without the
+  `append` denial.
+- Not done: no kata pod on worker1 (see Known issues) and `helm
+  uninstall` never run.
 
 ## Environment
 
@@ -171,8 +175,11 @@ done
 ```
 
 Observed: the status lists `kata-deploy-crio-append.service` next to
-the cluster's own `iri-registry.service`. The worker pool was
-`Updated` 51 s after the apply. Boot IDs were unchanged and no node
+the cluster's own `iri-registry.service`. On the fresh install the
+status read right after the patch still showed only
+`iri-registry.service`; the unit appeared a few seconds later. The
+worker pool was `Updated` 51 s after the apply (57 s on the fresh
+install). Boot IDs were unchanged and no node
 was drained; each worker got these events instead:
 
 ```
@@ -190,8 +197,9 @@ active
 401 kata-deploy-crio-append      cil
 ```
 
-The chart was already installed on this run; on a fresh cluster only
-`kata-deploy-crio-append` is listed until section 5.
+The chart was already installed on this run. On the fresh install
+only `kata-deploy-crio-append` was listed; the other two appear in
+section 5.
 
 After editing the `.cil` file, regenerate the data URL in the
 MachineConfig. On an unchanged file this leaves the MachineConfig as
@@ -330,8 +338,8 @@ Error from server (Forbidden): pods "runc-test" is forbidden: ValidatingAdmissio
 A pod with SA `podman`, `privileged: true` and no RuntimeClass gets
 the same denial. A kata pod is admitted, labelling the running
 `podman-in-kata` (an update) works, and pods in other namespaces are
-unaffected. The loop was run against an existing `kata-test`; applying
-the policy before the namespace exists has not been run.
+unaffected. On the fresh install the policy was applied before
+`kata-test` existed, and the loop was denied on its second try.
 
 ## 5. Install kata-deploy
 
@@ -361,9 +369,14 @@ helm install kata-deploy \
 oc get pods -n kata-deploy -w
 ```
 
-With section 3 in place the pods should go straight to `1/1
-Running`; without it they crash-loop as described there. Their log
-(`oc logs -n kata-deploy ds/kata-deploy`) ends with:
+With section 3 in place the pods go straight to `1/1 Running`;
+without it they crash-loop as described there. On the fresh install
+both pods were `1/1 Running` 90 s after `helm install`, with no
+restarts. Right after that they dropped to `0/1` for about 15 s
+(readiness probe 503 while kata-deploy checks that its node labels
+stay set) and then stayed Ready, so wait for Ready rather than trust
+the first `1/1`. Their log
+(`oc logs -n kata-deploy ds/kata-deploy`) contains:
 
 ```
 install (cri): crio is serving ["kata-qemu-runtime-rs"]
@@ -460,7 +473,8 @@ oc get pods -n kata-test \
 ```
 
 Observed output (trimmed). The pod was Ready after 13 s including the
-image pull, and everything worked on the first try:
+image pull (11 s on the fresh install), and everything worked on the
+first try:
 
 ```
 privileged

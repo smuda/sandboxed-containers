@@ -29,9 +29,10 @@ subjects:
     namespace: kata-test
 ---
 # The image default uses fuse-overlayfs and an imagestore on the
-# container rootfs. In kata the rootfs is virtio-fs, which cannot back
-# overlay, and /dev/fuse is not passed into the guest. Keep all storage
-# on the tmpfs volume below so native overlay works.
+# container rootfs. In kata the rootfs and disk emptyDirs are virtio-fs,
+# which cannot back native overlay, and /dev/fuse is not passed into the
+# guest. vfs copies layers instead of overlaying them, so it works on
+# the disk emptyDir below and keeps images out of guest RAM.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -40,7 +41,7 @@ metadata:
 data:
   storage.conf: |
     [storage]
-    driver = "overlay"
+    driver = "vfs"
     runroot = "/run/containers/storage"
     graphroot = "/var/lib/containers/storage"
 ---
@@ -73,9 +74,13 @@ spec:
           subPath: storage.conf
   volumes:
     - name: containers-storage
+      # On the worker's disk, shared into the guest over virtio-fs.
+      # Guest root can write any uid, setuid files and device nodes
+      # here. The pod's SELinux MCS label keeps other containers out,
+      # not unconfined root on the node (host /var has no nodev/nosuid).
+      # sizeLimit is enforced by kubelet eviction, not a quota.
       emptyDir:
-        medium: Memory
-        sizeLimit: 1Gi
+        sizeLimit: 10Gi
     - name: storage-conf
       configMap:
         name: podman-storage-conf

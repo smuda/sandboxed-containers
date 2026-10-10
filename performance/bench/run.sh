@@ -27,8 +27,9 @@ Usage: run.sh [--node NAME] [--smoke] [--setup NAME]
 USAGE
 }
 
-die() { echo "error: $*" >&2; exit 1; }
-warn() { echo "warn: $*" >&2; }
+ts() { date "+%Y-%m-%d %H:%M:%S"; }
+die() { echo "$(ts) error: $*" >&2; exit 1; }
+warn() { echo "$(ts) warn: $*" >&2; }
 k() { oc -n "$NS" "$@"; }
 px() { k exec bench-probe -- "$@"; }
 pexec() { k exec "$1" -- timeout 900 sh -c "$2"; }
@@ -412,7 +413,8 @@ run_one() { # setup workload rep
   pod=bench-$setup-${wl/stress-ng/stressng}-r$rep
   dir=$OUT/raw/$setup/$wl/r$rep
   mkdir -p "$dir"
-  echo "== $pod" >&2
+  N=$((N + 1))
+  echo "$(ts) [$N/$TOTAL] == $pod" >&2
   image=$PODMAN_IMG
   if [ "$wl" = stress-ng ] && ! $PRIV; then image=$STRESS_IMG; fi
   if [ "$wl" = fio ] && ! $PRIV; then image=$FIO_IMG; fi
@@ -425,21 +427,30 @@ run_one() { # setup workload rep
     echo "pod $pod not Ready" >>"$dir/error.txt"
   fi
   rmpod "$pod" || warn "could not delete $pod"
-  if [ -s "$dir/error.txt" ]; then warn "$pod: see $dir/error.txt"; else rm -f "$dir/error.txt"; fi
+  [ -s "$dir/error.txt" ] || rm -f "$dir/error.txt"
+  if ls "$dir"/error*.txt >/dev/null 2>&1; then warn "FAILED $pod: see $dir/error*.txt"; fi
 }
+
+wls_for() { if $PRIV; then echo "podman-ops stress-ng fio"; else echo "stress-ng fio"; fi; }
+
+N=0 TOTAL=0
+for setup in "${SETUPS[@]}"; do
+  if [ -n "$ONLY" ] && [ "$setup" != "$ONLY" ]; then continue; fi
+  setup_attrs "$setup"
+  set -- $(wls_for)
+  TOTAL=$((TOTAL + $# * REPS))
+done
 
 for rep in $(seq 1 "$REPS"); do
   for setup in "${SETUPS[@]}"; do
     if [ -n "$ONLY" ] && [ "$setup" != "$ONLY" ]; then continue; fi
     setup_attrs "$setup"
-    wls="stress-ng fio"
-    if $PRIV; then wls="podman-ops stress-ng fio"; fi
-    for wl in $wls; do run_one "$setup" "$wl" "$rep"; done
+    for wl in $(wls_for); do run_one "$setup" "$wl" "$rep"; done
   done
 done
 
 "$HERE/summarize.sh" "$OUT"
-echo "results: $OUT"
+echo "$(ts) results: $OUT"
 if ! $SMOKE; then
   echo "commit with: git add \"$OUT\" && git commit -m \"test: add kata benchmark run $(basename "$OUT")\""
 fi

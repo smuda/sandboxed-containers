@@ -1,0 +1,30 @@
+{
+  "s0": {
+    "t": 1791619574.535996439,
+    "cpu_usec": 8945,
+    "mem_current": 806912,
+    "mem_peak": 2428928,
+    "disk_bytes": 0
+  },
+  "s1": {
+    "t": 1791619604.971008244,
+    "cpu_usec": 8945,
+    "mem_current": 610304,
+    "mem_peak": 2428928,
+    "disk_bytes": 0
+  },
+  "s2": {
+    "t": 1791619605.318408954,
+    "cpu_usec": 8945,
+    "mem_current": 610304,
+    "mem_peak": 2428928,
+    "disk_bytes": 0
+  },
+  "s3": {
+    "t": 1791619786.648510326,
+    "cpu_usec": 717356214,
+    "mem_current": 1314816,
+    "mem_peak": 42463232,
+    "disk_bytes": 0
+  }
+}

@@ -46,11 +46,12 @@ RuntimeClass overhead is accounted for.
 Plain Setups run stress-ng and fio in the pod, on an emptyDir at
 `/bench`. Podman Setups run podman-ops, then stress-ng and fio in
 nested containers; fio writes into the nested container's own rootfs.
-All pods use the podman image as the Setup's base, run as root and are
-admitted through the privileged SCC; only podman Setups are privileged
-containers. fio comes from `dnf install` (the openeuler fio image
-crashes with SIGILL on some CPUs), run before the first Footprint
-snapshot in plain pods and in an untimed image build in podman pods.
+All pods run as root and are admitted through the privileged SCC; only
+podman Setups are privileged containers. Podman Setups use the podman
+image as the pod image; plain pods use the stress-ng or fio image.
+fio comes from the fio image (see below): plain pods run it directly,
+podman pods pull it in an untimed step before the second Footprint
+snapshot.
 The probe pod reads the node's cgroups through a read-only hostPath.
 Baselines: plain-kata against plain-runc, podman-kata-vfs-disk against
 podman-runc-vfs-disk, podman-kata-overlay-ram against
@@ -93,4 +94,7 @@ The benchmark's fio image is built from `bench/fio/Containerfile` by
 `ghcr.io/smuda/sandboxed-containers/fio` on every push to main that
 touches `bench/fio/`. After the first push, set the package to public
 once in GitHub (package settings, change visibility) so the cluster can
-pull it without a secret. `run.sh` will pin the image by digest.
+pull it without a secret. `run.sh` pins the image by tag and digest
+(`FIO_IMG`); update it after a rebuild. The image is Fedora with fio,
+used instead of the openeuler fio image, which crashes with SIGILL on
+some CPUs.

@@ -7,6 +7,7 @@ export LC_ALL=C # awk must not use a comma decimal separator
 NS=kata-bench
 STRESS_IMG=ghcr.io/colinianking/stress-ng:72a9d0cae0f420a887991d4024d3101c4af7a4fc@sha256:2ea9a7c3828eda1b1ca3d0b0c5a669ec252f9caf97a6a33aedcea6b2a66d1cbe
 PODMAN_IMG=quay.io/podman/stable:v5.8.7@sha256:74a13ba41b840e83926aa41017fe855c921bf466868f3464a85fc4af5c62503f
+FIO_IMG=ghcr.io/smuda/sandboxed-containers/fio:sha-d9f926a8e8b16637c311215fbd6df8505e4ac173@sha256:611749d5b0ebdc0b6684ce4e016d35945bf34625b93585e38d0fe8eb5a4a35d8
 SETUPS=(plain-runc plain-kata podman-runc-overlay-disk podman-runc-vfs-disk
   podman-kata-vfs-disk podman-runc-overlay-ram podman-kata-overlay-ram)
 
@@ -197,7 +198,7 @@ jq -n --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg flavour "$flavour" --arg
   --arg node "$NODE" --arg cpu_model "$cpu_model" --argjson cpus "$cpus" --argjson mem "$mem_kib" \
   --argjson ni "$(oc get node "$NODE" -o json | jq .status.nodeInfo)" --argjson disks "$disks" \
   --argjson rc "$rc_json" --argjson ds "${ds_images:-[]}" --arg csv "$csv" --argjson cfg "$kata_cfg" \
-  --arg stress "$STRESS_IMG" --arg podman "$PODMAN_IMG" \
+  --arg stress "$STRESS_IMG" --arg podman "$PODMAN_IMG" --arg fio "$FIO_IMG" \
   --argjson stress_secs "$STRESS_SECS" --argjson fio_runtime "$FIO_RUNTIME" --argjson fio_ramp "$FIO_RAMP" \
   --arg fio_size "$FIO_SIZE" --argjson runs "$RUNS" --argjson idle "$IDLE" --argjson reps "$REPS" \
   '{date: $date, cluster: {flavour: $flavour, version: $version},
@@ -207,7 +208,7 @@ jq -n --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg flavour "$flavour" --arg
     kata: {handler: $rc.handler, overhead: ($rc.overhead.podFixed // {}), daemonset_images: $ds,
            csv: (if $csv == "" then null else $csv end), config: $cfg},
     pod: {cpu: "4", memory: "4Gi"},
-    images: {stress_ng: $stress, podman: $podman},
+    images: {stress_ng: $stress, podman: $podman, fio: $fio},
     durations: {stress_secs: $stress_secs, fio_runtime: $fio_runtime, fio_ramp: $fio_ramp,
                 fio_size: $fio_size, podman_runs: $runs, idle_wait: $idle},
     repetitions: $reps}' >"$OUT/environment.json"
@@ -327,9 +328,9 @@ wl_stress_ng() {
 }
 
 wl_fio() {
-  local pat mode job rw bs flags dir cmd img=
+  local pat mode job rw bs flags dir cmd
   dir=/bench
-  if $PRIV; then dir=/fio-test img=bench-fio; fi
+  if $PRIV; then dir=/fio-test; fi
   for pat in randread-4k randwrite-4k seqread-1m seqwrite-1m; do
     case $pat in
       randread-4k) rw=randread bs=4k ;;
@@ -342,7 +343,7 @@ wl_fio() {
       if [ $mode = direct ]; then flags=--direct=1; else flags="--direct=0 --end_fsync=1"; fi
       cmd="fio --name=$job --rw=$rw --bs=$bs --ioengine=psync --numjobs=1 --size=$FIO_SIZE --time_based --runtime=$FIO_RUNTIME --ramp_time=$FIO_RAMP --filename=$dir/fio.dat $flags --output-format=json"
       # Nested: fio writes into the nested container's own rootfs.
-      if $PRIV; then cmd="podman run --rm --network none --entrypoint sh $img -c 'mkdir -p $dir && $cmd'"; fi
+      if $PRIV; then cmd="podman run --rm --network none --entrypoint sh $FIO_IMG -c 'mkdir -p $dir && $cmd'"; fi
       # O_DIRECT can be refused (e.g. virtio-fs); keep stderr and move on.
       if pexec "$1" "$cmd" >"$2/fio-$job.json" 2>"$2/error-$job.txt"; then
         rm -f "$2/error-$job.txt"
@@ -376,7 +377,7 @@ EOF
     jq -Rn '[inputs | split(" ") | {key: .[0], value: (.[1] | tonumber)}] | from_entries' >"$2/timings.json"
 }
 
-# Untimed setup step; dnf and podman chatter on stderr only matters on failure.
+# Untimed setup step; podman chatter on stderr only matters on failure.
 prep() { # pod cmd dir
   local out
   out=$(pexec "$1" "$2" 2>&1) || { echo "$out" >>"$3/error.txt"; return 1; }
@@ -384,17 +385,13 @@ prep() { # pod cmd dir
 
 measure() { # pod workload dir
   local pod=$1 wl=$2 dir=$3 s0 s1 s2 s3
-  if ! $PRIV && [ "$wl" = fio ]; then # the pod image has no fio; not part of the measurement
-    prep "$pod" "dnf install -y --setopt=install_weak_deps=False fio" "$dir" || return 1
-  fi
   s0=$(snapshot "$pod") || return 1
   sleep "$IDLE"
   s1=$(snapshot "$pod") || return 1
   if $PRIV && [ "$wl" = stress-ng ]; then # untimed, before s2
     prep "$pod" "podman pull -q $STRESS_IMG" "$dir" || return 1
   elif $PRIV && [ "$wl" = fio ]; then
-    prep "$pod" "printf 'FROM %s\\nRUN dnf install -y --setopt=install_weak_deps=False fio\\n' $PODMAN_IMG >/tmp/Containerfile.fio &&
-      podman build -q -t bench-fio -f /tmp/Containerfile.fio /tmp" "$dir" || return 1
+    prep "$pod" "podman pull -q $FIO_IMG" "$dir" || return 1
   fi
   s2=$(snapshot "$pod") || return 1
   "wl_${wl//-/_}" "$pod" "$dir"
@@ -418,6 +415,7 @@ run_one() { # setup workload rep
   echo "== $pod" >&2
   image=$PODMAN_IMG
   if [ "$wl" = stress-ng ] && ! $PRIV; then image=$STRESS_IMG; fi
+  if [ "$wl" = fio ] && ! $PRIV; then image=$FIO_IMG; fi
   pod_yaml "$pod" "$image" >"$dir/pod.yaml"
   rmpod "$pod" || warn "could not clear old $pod"
   if k apply -f "$dir/pod.yaml" >/dev/null 2>>"$dir/error.txt" &&

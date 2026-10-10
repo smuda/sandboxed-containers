@@ -1,0 +1,54 @@
+---
+build-info:
+      compiler: 'gcc 14.2.0'
+      stdc-version: '199901L'
+      stdc-hosted: '1'
+
+system-info:
+      stress-ng-version: '0.22.01'
+      run-by: 'unknown'
+      date-yyyy-mm-dd: '2026:10:10'
+      time-hh-mm-ss: '12:00:00'
+      epoch-secs: 1760097600
+      hostname: 'bench-pod'
+      sysname: 'Linux'
+      nodename: 'bench-pod'
+      release: '6.12.0'
+      version: '#1 SMP PREEMPT'
+      machine: 'x86_64'
+      compiler: 'gcc 14.2.0'
+      libc: 'glibc 2.41'
+      uptime: 4242
+      totalram: 4294967296
+      freeram: 3221225472
+      sharedram: 0
+      bufferram: 1048576
+      totalswap: 0
+      freeswap: 0
+      pagesize: 4096
+      cpus: 4
+      cpus-online: 4
+      ticks-per-second: 100
+
+metrics:
+    - stressor: cpu
+      bogo-ops: 54000
+      bogo-ops-per-second-usr-sys-time: 225.5
+      bogo-ops-per-second-real-time: 900
+      wall-clock-time: 60.000000
+      user-time: 239.500000
+      system-time: 0.250000
+      cpu-usage-per-instance: 99.935244
+      max-rss: 5336
+      instances:
+          - instance: 0
+            bogo-ops: 54000
+            bogo-ops-per-second-usr-sys-time: 225.5
+            bogo-ops-per-second-real-time: 900
+            wall-clock-time: 60.000000
+            user-time: 239.500000
+            system-time: 0.250000
+            cpu-usage: 99.935244
+            max-rss: 5336
+
+...

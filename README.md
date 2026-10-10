@@ -9,6 +9,9 @@ Each log is written so the install can be reproduced on a fresh
 cluster by following it top to bottom. The manifests it applies are
 in the matching directory.
 
+The cost of kata compared with runc is measured in
+[performance/README.md](performance/README.md).
+
 ## Results
 
 | | OpenShift | OKD |

@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kata-bench
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: bench
+  namespace: kata-bench
+automountServiceAccountToken: false
+---
+# Lets any pod using SA bench run privileged. The namespace only holds
+# benchmark pods, and run.sh deletes them as it goes.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: bench-privileged-scc
+  namespace: kata-bench
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:privileged
+subjects:
+  - kind: ServiceAccount
+    name: bench
+    namespace: kata-bench
+---
+# No mount_program and no imagestore: the image defaults use
+# fuse-overlayfs, which kata does not pass through (no /dev/fuse).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: storage-overlay
+  namespace: kata-bench
+data:
+  storage.conf: |
+    [storage]
+    driver = "overlay"
+    runroot = "/run/containers/storage"
+    graphroot = "/var/lib/containers/storage"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: storage-vfs
+  namespace: kata-bench
+data:
+  storage.conf: |
+    [storage]
+    driver = "vfs"
+    runroot = "/run/containers/storage"
+    graphroot = "/var/lib/containers/storage"

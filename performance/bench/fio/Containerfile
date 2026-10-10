@@ -1,0 +1,6 @@
+# Fedora, not openeuler/fio: that image was compiled for newer CPUs and
+# dies with SIGILL on worker2's i7-10710U. Fedora targets baseline x86-64.
+# The package is unpinned on purpose (Fedora drops old builds from
+# updates); the image digest is the pin.
+FROM quay.io/fedora/fedora:44@sha256:8ade22c0f76f6b2f0892290b1fb39fa1bda1566ba6e276a2ed427f45589c159b
+RUN dnf install -y --setopt=install_weak_deps=False fio && dnf clean all

@@ -85,3 +85,12 @@ build and run timings instead. fio with O_DIRECT can be refused on
 virtio-fs; the stderr is kept in `error-<job>.txt`.
 Prometheus range queries for each pod are saved as
 `prometheus-*.json` and are not part of `summary.csv`.
+
+## fio image
+
+The benchmark's fio image is built from `bench/fio/Containerfile` by
+`.github/workflows/fio-image.yml` and pushed to
+`ghcr.io/smuda/sandboxed-containers/fio` on every push to main that
+touches `bench/fio/`. After the first push, set the package to public
+once in GitHub (package settings, change visibility) so the cluster can
+pull it without a secret. `run.sh` will pin the image by digest.

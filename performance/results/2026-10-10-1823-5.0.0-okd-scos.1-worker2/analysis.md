@@ -10,6 +10,39 @@ an ext4 image on a virtio-blk device (`emptydir_mode = "block-plain"`,
 Ratios are kata median / runc Baseline median from
 [summary.csv](summary.csv), 3 repetitions unless noted.
 
+## Summary: what running in kata costs
+
+Compute and memory run at native speed. Disk costs anywhere from
+nothing to about 75%, depending on how small and synchronous the I/O
+is, and every pod pays a fixed price in memory, with extra node CPU
+for its I/O. There is no single "virtualisation penalty" figure.
+
+No measurable cost: CPU and matrix work (0.99-1.01 of runc), memory
+bandwidth (1.03), buffered small writes to a block-plain emptyDir
+(1.11) and tmpfs emptyDirs (within 9%).
+
+On a block-plain emptyDir, the cost depends on the access pattern:
+
+| access pattern | kata / runc | cost |
+|-|-|-|
+| buffered 4k random writes | 1.11 | none |
+| 1 MiB direct writes | 0.89 | ~10% |
+| 1 MiB reads | 0.73-0.87 | ~15-25% |
+| small random reads, cold | 0.62 | ~40% |
+| buffered streaming writes | 0.46 | ~55%, mostly the guest's smaller page cache |
+| 4k direct or fsync-bound writes | 0.25 | ~75% |
+
+A fixed ~30 µs per I/O hurts small synchronous operations most and
+large or cached ones hardly at all. Outside the emptyDir, the
+container's own filesystem still goes over virtio-fs, where buffered
+writes run at 0.14 of runc (run 0635): writing a lot outside a volume
+is the slowest case.
+
+The fixed price: about 265-322 MB of memory and 4-33 mcores of CPU per
+idle pod, about 4x the node CPU for the same disk I/O, and slower
+container starts for nested podman (`run --rm` 2.6x on overlay in
+RAM). Network and pod start-up time were not measured.
+
 ## CPU and memory bandwidth: no cost
 
 | | plain | nested vfs disk | nested overlay RAM |

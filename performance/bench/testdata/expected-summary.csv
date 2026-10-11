@@ -6,7 +6,7 @@ plain-runc,stress-ng,idle_cpu_mcores,mcores,lower,3,4,2,6,,
 plain-runc,stress-ng,idle_mem_bytes,bytes,lower,3,5e+07,4e+07,6e+07,,
 plain-runc,stress-ng,matrix_bogo_ops_s,ops/s,higher,3,600,500,700,,
 plain-runc,stress-ng,mem_peak_bytes,bytes,lower,3,2e+09,1e+09,3e+09,,
-plain-runc,stress-ng,stream_bogo_ops_s,ops/s,higher,3,300,200,400,,
+plain-runc,stress-ng,stream_read_mb_s,MB/s,higher,3,3000,2000,4000,,
 plain-runc,fio,cpu_s,s,lower,3,400,200,600,,
 plain-runc,fio,disk_bytes,bytes,lower,3,0,0,0,,
 plain-runc,fio,idle_cpu_mcores,mcores,lower,3,4,2,6,,
@@ -43,7 +43,7 @@ plain-kata,stress-ng,idle_cpu_mcores,mcores,lower,3,6,3,9,4,1.5000
 plain-kata,stress-ng,idle_mem_bytes,bytes,lower,3,1e+08,8e+07,1.2e+08,5e+07,2.0000
 plain-kata,stress-ng,matrix_bogo_ops_s,ops/s,higher,3,360,300,420,600,0.6000
 plain-kata,stress-ng,mem_peak_bytes,bytes,lower,3,4e+09,2e+09,6e+09,2e+09,2.0000
-plain-kata,stress-ng,stream_bogo_ops_s,ops/s,higher,3,210,180,240,300,0.7000
+plain-kata,stress-ng,stream_read_mb_s,MB/s,higher,3,2100,1800,2400,3000,0.7000
 plain-kata,fio,cpu_s,s,lower,3,800,400,1200,400,2.0000
 plain-kata,fio,disk_bytes,bytes,lower,3,4000,2000,6000,0,
 plain-kata,fio,idle_cpu_mcores,mcores,lower,3,6,3,9,4,1.5000

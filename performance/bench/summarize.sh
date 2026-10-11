@@ -20,6 +20,7 @@ meta() {
   case $1 in
     *_iops | *_ops_s) U=ops/s B=higher ;;
     *_bw) U=bytes/s B=higher ;;
+    *_mb_s) U=MB/s B=higher ;;
     *_clat_p99) U=ns B=lower ;;
     idle_cpu_mcores) U=mcores B=lower ;;
     *_bytes) U=bytes B=lower ;;
@@ -38,14 +39,14 @@ emit() {
 metrics_for() {
   case $1 in
     podman-ops) echo pull_stress_ng_s pull_podman_s build_s run_rm_mean_s ;;
-    stress-ng) echo cpu_bogo_ops_s matrix_bogo_ops_s stream_bogo_ops_s ;;
+    stress-ng) echo cpu_bogo_ops_s matrix_bogo_ops_s stream_read_mb_s ;;
     fio) for j in $JOBS; do echo "${j}_iops ${j}_bw ${j}_clat_p99"; done ;;
   esac
   echo idle_cpu_mcores idle_mem_bytes cpu_s mem_peak_bytes disk_bytes
 }
 
 collect() {
-  local si=0 wi s w d r m v j st f
+  local si=0 wi s w d r m v j st f k
   for s in "${SETUPS[@]}"; do
     si=$((si + 1)) wi=0
     for w in "${WLS[@]}"; do
@@ -65,9 +66,11 @@ collect() {
             for st in cpu matrix stream; do
               f=$r/stress-$st.yaml
               [ -f "$f" ] || continue
-              v=$(awk -v s="$st" '/stressor:/ { cur = $NF }
-                /bogo-ops-per-second-real-time:/ && cur == s { print $2; exit }' "$f")
-              if [ -n "$v" ]; then emit "${st}_bogo_ops_s" "$v"; fi
+              k=bogo-ops-per-second-real-time m=${st}_bogo_ops_s
+              if [ $st = stream ]; then k=mb-per-sec-memory-read-rate m=stream_read_mb_s; fi
+              v=$(awk -v s="$st" -v k="$k:" '/stressor:/ { cur = $NF }
+                $1 == k && cur == s { print $2; exit }' "$f")
+              if [ -n "$v" ]; then emit "$m" "$v"; fi
             done ;;
           fio)
             for j in $JOBS; do

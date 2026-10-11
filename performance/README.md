@@ -72,8 +72,10 @@ One row per Setup, workload and metric, sorted in that order.
 
 Metrics:
 
-- stress-ng: `cpu_bogo_ops_s`, `matrix_bogo_ops_s`,
-  `stream_bogo_ops_s` (bogo-ops per second, real time)
+- stress-ng: `cpu_bogo_ops_s`, `matrix_bogo_ops_s` (bogo-ops per
+  second, real time), `stream_read_mb_s` (memory read rate, MB/s;
+  arrays fixed at `--stream-l3-size 64M` so runc and kata measure
+  the same working set)
 - fio, per job `<pattern>-<direct|buffered>`: `_iops`, `_bw`
   (bytes/s), `_clat_p99` (ns)
 - podman-ops: `pull_stress_ng_s`, `pull_podman_s`, `build_s`,

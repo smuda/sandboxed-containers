@@ -295,7 +295,8 @@ snapshot() { # pod -> one JSON line, read from the node via the probe
     cpu=$(sed -n "s/^usage_usec //p" "$d/cpu.stat")
     cur=$(cat "$d/memory.current")
     peak=$(cat "$d/memory.peak" 2>/dev/null || echo 0)
-    disk=$(du -sb "/host/var/lib/kubelet/pods/$1/volumes/kubernetes.io~empty-dir/" 2>/dev/null | cut -f1)
+    # Allocated, not apparent: kata block-plain puts a sparse host-FS-sized image here.
+    disk=$(du -sk "/host/var/lib/kubelet/pods/$1/volumes/kubernetes.io~empty-dir/" 2>/dev/null | awk "{ print \$1 * 1024 }")
     printf "{\"t\":%s,\"cpu_usec\":%s,\"mem_current\":%s,\"mem_peak\":%s,\"disk_bytes\":%s}\n" \
       "$(date +%s.%N)" "$cpu" "$cur" "$peak" "$disk"
   ' _ "$uid") || return 1
@@ -320,9 +321,12 @@ prom() { # pod start end dir
 
 # --- workloads: each takes pod and raw dir, records failures in error.txt ---
 wl_stress_ng() {
-  local s cmd
+  local s cmd opt
   for s in cpu matrix stream; do
-    cmd="stress-ng --$s 4 --timeout ${STRESS_SECS}s --metrics --yaml /tmp/$s.yaml >/dev/null 2>&1; cat /tmp/$s.yaml"
+    opt=
+    # stress-ng sizes stream arrays from the detected L3, which differs in a kata guest
+    if [ $s = stream ]; then opt="--stream-l3-size 64M"; fi
+    cmd="stress-ng --$s 4 $opt --timeout ${STRESS_SECS}s --metrics --yaml /tmp/$s.yaml >/dev/null 2>&1; cat /tmp/$s.yaml"
     if $PRIV; then cmd="podman run --rm --network none --entrypoint sh $STRESS_IMG -c '$cmd'"; fi
     pexec "$1" "$cmd" >"$2/stress-$s.yaml" 2>>"$2/error.txt" || echo "stress-ng $s failed" >>"$2/error.txt"
   done

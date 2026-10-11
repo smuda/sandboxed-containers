@@ -35,6 +35,7 @@ metrics:
       bogo-ops: 10800
       bogo-ops-per-second-usr-sys-time: 45.5
       bogo-ops-per-second-real-time: 180
+      mb-per-sec-memory-read-rate: 1800
       wall-clock-time: 60.000000
       user-time: 239.500000
       system-time: 0.250000

@@ -43,6 +43,151 @@ idle pod, about 4x the node CPU for the same disk I/O, and slower
 container starts for nested podman (`run --rm` 2.6x on overlay in
 RAM). Network and pod start-up time were not measured.
 
+## Assessment for CI workloads
+
+The comparison that matters for CI is not kata against runc. It is
+kata against running podman privileged directly on the node: is the
+slowdown a reasonable price for keeping that privilege inside a VM?
+With the `kata-block-emptydir` RuntimeClass, we think it is for both
+workloads below, more clearly for image builds. Both judgements are
+inferred from these microbenchmarks, not measured on real pipelines.
+
+### Java and Go image builds: acceptable
+
+Compiling is CPU work, which runs at native speed (0.99-1.01), and
+`javac`, the Go compiler and the linker write their output with
+buffered I/O, which on block-plain runs at runc speed (1.11). The image
+steps cost more, but moderately: pulls are 1.08x, and `podman build`
+is 1.44x runc with the same vfs storage and 2.2x runc with overlay.
+Most of that last gap is vfs itself; overlay storage inside kata on
+the block-backed emptyDir would probably close it, but is untested.
+
+That holds only if everything a build writes lands on the block-plain
+emptyDir: the workspace, `~/.m2` or `~/.gradle`, `GOMODCACHE` and
+`GOCACHE`, and `/var/lib/containers`. Anything written to the
+container's own filesystem still goes over virtio-fs at 0.14 of runc.
+The emptyDir needs a generous `sizeLimit`, or none, because of the
+ext4 metadata eviction issue
+([kata#13310](https://github.com/kata-containers/kata-containers/issues/13310)),
+and pod memory has to cover the JVM plus the guest page cache, since
+kata does not give RAM back. Our estimate is 1.1-1.5x total pipeline
+time, mostly from the image build steps.
+
+### Compose integration tests with podman: acceptable, depending on the tests
+
+Starting containers is slower, but small in absolute terms: `run
+--rm` takes 0.48 s per container in kata with vfs, against 0.07 s on
+runc with overlay. For a compose stack of 5-10 services that is a few
+seconds per test run, negligible next to most suites.
+
+Databases are the real risk. Postgres, MySQL and similar commit with
+fsync, which is the 4k synchronous write case at 0.25 of runc, so a
+suite dominated by many small transactions could run 2-4x slower. The
+usual CI fix removes most of it: put database data on tmpfs (a
+`medium: Memory` emptyDir runs within 9% of runc), or switch off
+durability in the test configuration (`fsync=off` for Postgres,
+`innodb_flush_log_at_trx_commit=0` for MySQL). Test data does not need
+to survive a crash.
+
+Not measured, and needed before relying on this: networking between
+the services (nested podman networking inside the guest) and from the
+pod to the outside, and memory pressure with the whole stack in one
+VM. The pod's memory limit has to cover every service, and kata does
+not release memory once used.
+
+## Operational consequences of block-plain
+
+The benchmark shows what block-plain does to throughput. For running
+it, what matters more is that a disk emptyDir stops being a directory
+on the node and becomes a disk inside the VM. That changes how much
+space the container sees, how limits are enforced, who can look at the
+data and what an idle pod costs. We tested the most important points
+on worker2 on 2026-10-11 with a kata and a runc pod, each with two
+containers sharing one emptyDir with `sizeLimit: 200Mi`; the rest
+comes from the kata source and upstream issues, linked where used.
+
+### What keeps working
+
+From inside the pod, block-plain behaves like an ordinary emptyDir.
+Containers in the same pod share it: a file written by one container
+was readable in the other. Deleted data gives its space back to the
+node, because the guest mounts the filesystem with `discard`; after
+writing and deleting 300 MiB, the image's allocation went from 324 MB
+back to 9.9 MB.
+
+`sizeLimit` is also still enforced, in the same way as under runc.
+Writing 400 MiB into the 200Mi emptyDir got both pods evicted about
+40 s later with the same message: "Usage of EmptyDir volume "data"
+exceeds the limit "200Mi"". kubelet measures the allocated blocks of
+`disk.img` on the node and sees them grow like any other file. In
+neither runtime is the limit a full disk: the write succeeds, and
+kubelet evicts the pod afterwards.
+
+### The disk the guest sees is the size of the node's filesystem
+
+What the container can no longer see is the limit, or the node. `df
+/data` in kata shows a 476 GB ext4 on `/dev/vda`, nearly empty, where
+runc shows the node's XFS with its real usage (43 GB used). The free
+space reported in the guest is the size of the image, not what the
+node has left. We did not test it, but if the node disk fills up
+first, the guest should get I/O errors from its block device rather
+than a clean ENOSPC.
+
+Making the guest disk match `sizeLimit` is not possible in kata 4.2.0.
+The shim sizes `disk.img` from `statfs()` of the emptyDir directory,
+which is the host filesystem
+([block_emptydir_volume.rs](https://github.com/kata-containers/kata-containers/blob/4.2.0/src/runtime-rs/crates/resource/src/volume/block_emptydir_volume.rs)).
+`sizeLimit` exists only in the pod spec; neither CRI nor OCI passes it
+to the runtime. Upstream issue
+[kata#13310](https://github.com/kata-containers/kata-containers/issues/13310)
+(open) discusses handing it over in a pod annotation, which is not
+implemented and is treated with caution, because annotations have been
+an attack vector in kata. Today, a size the guest actually sees needs a
+generic ephemeral volume from a local block CSI driver (for example
+LVM Storage) instead of an emptyDir; kata hot-plugs that device at its
+requested size. This cluster only has `nfs-csi`.
+
+### An idle pod can be evicted by filesystem metadata
+
+The large image has a cost of its own, also described in
+[kata#13310](https://github.com/kata-containers/kata-containers/issues/13310).
+The guest formats the image as ext4 and initialises the inode tables
+lazily in the background. That allocates about 0.08% of the image size
+on the node, roughly 400 MB for our 511 GB image, without the pod
+writing anything. kubelet counts it as emptyDir usage, so a pod with a
+small `sizeLimit`, like the 200Mi in our test, can be evicted while
+idle. Our test pod showed 9.9 MB right after start and was not watched
+long enough to see the growth. The same background work is the most
+likely source of the extra idle CPU in the Footprint section. A fix is
+proposed upstream behind a `[runtime]` flag that mounts the image with
+`noinit_itable`, which brings an empty volume down to about 13 MB
+([kata#13977](https://github.com/kata-containers/kata-containers/pull/13977),
+open).
+
+### The data lives inside the VM
+
+On the node, the emptyDir directory now holds a single `disk.img`
+(511 GB apparent, 9.9 MB allocated when fresh). Inspecting, copying
+or collecting files from the node side no longer works; the files are
+only reachable through the pod. The same goes for the page cache:
+O_DIRECT in the guest reaches the NVMe, and buffered data is cached
+only in guest RAM, inside the pod's memory limit, instead of twice
+(guest and node) as with virtio-fs.
+
+Each disk emptyDir in a kata pod is a hot-plugged block device. With
+the image comes a fixed cost of about 57 MB of memory and 30 mcores
+of CPU per idle pod (see Footprint).
+
+### Rolling it out
+
+The setting is per shim, not per pod. With the drop-in in place, every
+pod using `kata` or `kata-qemu-runtime-rs` gets block-plain emptyDirs,
+and there is no per-pod opt-out; offering both would take a separate
+RuntimeClass (kata-deploy `customRuntimes`). The drop-in also has to
+set `block_device_aio = "native"`: with the default `io_uring`, every
+kata pod with a disk emptyDir fails to start on SCOS, which sets
+`kernel.io_uring_disabled = 2`.
+
 ## CPU and memory bandwidth: no cost
 
 | | plain | nested vfs disk | nested overlay RAM |
@@ -145,99 +290,6 @@ virtio-fs remains unknown; it no longer matters for this setup.
 block-plain. fio is within 9% of runc on every job (kata faster on
 sequential writes), podman-ops build 1.74x, `run --rm` 2.6x, pull
 1.11x. Peak memory 4.6 GB against 3.0 GB. Same picture as run 0635.
-
-## Operational consequences of block-plain
-
-The benchmark shows what block-plain does to throughput. For running
-it, what matters more is that a disk emptyDir stops being a directory
-on the node and becomes a disk inside the VM. That changes how much
-space the container sees, how limits are enforced, who can look at the
-data and what an idle pod costs. We tested the most important points
-on worker2 on 2026-10-11 with a kata and a runc pod, each with two
-containers sharing one emptyDir with `sizeLimit: 200Mi`; the rest
-comes from the kata source and upstream issues, linked where used.
-
-### What keeps working
-
-From inside the pod, block-plain behaves like an ordinary emptyDir.
-Containers in the same pod share it: a file written by one container
-was readable in the other. Deleted data gives its space back to the
-node, because the guest mounts the filesystem with `discard`; after
-writing and deleting 300 MiB, the image's allocation went from 324 MB
-back to 9.9 MB.
-
-`sizeLimit` is also still enforced, in the same way as under runc.
-Writing 400 MiB into the 200Mi emptyDir got both pods evicted about
-40 s later with the same message: "Usage of EmptyDir volume "data"
-exceeds the limit "200Mi"". kubelet measures the allocated blocks of
-`disk.img` on the node and sees them grow like any other file. In
-neither runtime is the limit a full disk: the write succeeds, and
-kubelet evicts the pod afterwards.
-
-### The disk the guest sees is the size of the node's filesystem
-
-What the container can no longer see is the limit, or the node. `df
-/data` in kata shows a 476 GB ext4 on `/dev/vda`, nearly empty, where
-runc shows the node's XFS with its real usage (43 GB used). The free
-space reported in the guest is the size of the image, not what the
-node has left. We did not test it, but if the node disk fills up
-first, the guest should get I/O errors from its block device rather
-than a clean ENOSPC.
-
-Making the guest disk match `sizeLimit` is not possible in kata 4.2.0.
-The shim sizes `disk.img` from `statfs()` of the emptyDir directory,
-which is the host filesystem
-([block_emptydir_volume.rs](https://github.com/kata-containers/kata-containers/blob/4.2.0/src/runtime-rs/crates/resource/src/volume/block_emptydir_volume.rs)).
-`sizeLimit` exists only in the pod spec; neither CRI nor OCI passes it
-to the runtime. Upstream issue
-[kata#13310](https://github.com/kata-containers/kata-containers/issues/13310)
-(open) discusses handing it over in a pod annotation, which is not
-implemented and is treated with caution, because annotations have been
-an attack vector in kata. Today, a size the guest actually sees needs a
-generic ephemeral volume from a local block CSI driver (for example
-LVM Storage) instead of an emptyDir; kata hot-plugs that device at its
-requested size. This cluster only has `nfs-csi`.
-
-### An idle pod can be evicted by filesystem metadata
-
-The large image has a cost of its own, also described in
-[kata#13310](https://github.com/kata-containers/kata-containers/issues/13310).
-The guest formats the image as ext4 and initialises the inode tables
-lazily in the background. That allocates about 0.08% of the image size
-on the node, roughly 400 MB for our 511 GB image, without the pod
-writing anything. kubelet counts it as emptyDir usage, so a pod with a
-small `sizeLimit`, like the 200Mi in our test, can be evicted while
-idle. Our test pod showed 9.9 MB right after start and was not watched
-long enough to see the growth. The same background work is the most
-likely source of the extra idle CPU in the Footprint section. A fix is
-proposed upstream behind a `[runtime]` flag that mounts the image with
-`noinit_itable`, which brings an empty volume down to about 13 MB
-([kata#13977](https://github.com/kata-containers/kata-containers/pull/13977),
-open).
-
-### The data lives inside the VM
-
-On the node, the emptyDir directory now holds a single `disk.img`
-(511 GB apparent, 9.9 MB allocated when fresh). Inspecting, copying
-or collecting files from the node side no longer works; the files are
-only reachable through the pod. The same goes for the page cache:
-O_DIRECT in the guest reaches the NVMe, and buffered data is cached
-only in guest RAM, inside the pod's memory limit, instead of twice
-(guest and node) as with virtio-fs.
-
-Each disk emptyDir in a kata pod is a hot-plugged block device. With
-the image comes a fixed cost of about 57 MB of memory and 30 mcores
-of CPU per idle pod (see Footprint).
-
-### Rolling it out
-
-The setting is per shim, not per pod. With the drop-in in place, every
-pod using `kata` or `kata-qemu-runtime-rs` gets block-plain emptyDirs,
-and there is no per-pod opt-out; offering both would take a separate
-RuntimeClass (kata-deploy `customRuntimes`). The drop-in also has to
-set `block_device_aio = "native"`: with the default `io_uring`, every
-kata pod with a disk emptyDir fails to start on SCOS, which sets
-`kernel.io_uring_disabled = 2`.
 
 ## Caveats
 

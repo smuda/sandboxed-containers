@@ -1,0 +1,81 @@
+---
+build-info:
+      compiler: 'gcc 14.2.0'
+      stdc-version: '199901L'
+      stdc-hosted: '1'
+
+system-info:
+      stress-ng-version: '0.22.01'
+      run-by: 'unknown'
+      date-yyyy-mm-dd: '2026:10:10'
+      time-hh-mm-ss: '19:36:46'
+      epoch-secs: 1791661006
+      hostname: 'bench-podman-kata-overlay-ram-stressng-r2'
+      sysname: 'Linux'
+      nodename: 'bench-podman-kata-overlay-ram-stressng-r2'
+      release: '6.18.35'
+      version: '#1 SMP Tue Sep 15 07:34:33 UTC 2026'
+      machine: 'x86_64'
+      compiler: 'gcc 14.2.0'
+      libc: 'glibc 2.41'
+      uptime: 98
+      totalram: 4158574592
+      freeram: 3867668480
+      sharedram: 159424512
+      bufferram: 1646592
+      totalswap: 0
+      freeswap: 0
+      pagesize: 4096
+      cpus: 5
+      cpus-online: 5
+      ticks-per-second: 100
+
+metrics:
+    - stressor: cpu
+      bogo-ops: 411621
+      bogo-ops-per-second-usr-sys-time: 1716.844290
+      bogo-ops-per-second-real-time: 6860.213325
+      wall-clock-time: 60.001195
+      user-time: 239.734432
+      system-time: 0.019984
+      cpu-usage-per-instance: 99.895683
+      max-rss: 6264
+      instances:
+          - instance: 0
+            bogo-ops: 103588
+            bogo-ops-per-second-usr-sys-time: 1727.744651
+            bogo-ops-per-second-real-time: 1726.400227
+            wall-clock-time: 60.002309
+            user-time: 59.947624
+            system-time: 0.007995
+            cpu-usage: 99.922186
+            max-rss: 6264
+          - instance: 1
+            bogo-ops: 102512
+            bogo-ops-per-second-usr-sys-time: 1710.462336
+            bogo-ops-per-second-real-time: 1708.495200
+            wall-clock-time: 60.001339
+            user-time: 59.928338
+            system-time: 0.003996
+            cpu-usage: 99.884994
+            max-rss: 6264
+          - instance: 2
+            bogo-ops: 102888
+            bogo-ops-per-second-usr-sys-time: 1716.562652
+            bogo-ops-per-second-real-time: 1714.792845
+            wall-clock-time: 60.000250
+            user-time: 59.930396
+            system-time: 0.007993
+            cpu-usage: 99.896898
+            max-rss: 6260
+          - instance: 3
+            bogo-ops: 102633
+            bogo-ops-per-second-usr-sys-time: 1712.603011
+            bogo-ops-per-second-real-time: 1710.524831
+            wall-clock-time: 60.000883
+            user-time: 59.928074
+            system-time: 0.000000
+            cpu-usage: 99.878654
+            max-rss: 6264
+
+...

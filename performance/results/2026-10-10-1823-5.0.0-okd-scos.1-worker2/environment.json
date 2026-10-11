@@ -1,0 +1,192 @@
+{
+  "date": "2026-10-10T16:23:59Z",
+  "cluster": {
+    "flavour": "okd",
+    "version": "5.0.0-okd-scos.1"
+  },
+  "node": {
+    "name": "worker2.okd4.example.com",
+    "cpu_model": "Intel(R) Core(TM) i7-10710U CPU @ 1.10GHz",
+    "cpus": 12,
+    "mem_total_kib": 65545972,
+    "kernel": "6.12.0-260.el10.x86_64",
+    "os_image": "CentOS Stream CoreOS 10.0.20260819-0 (Coughlan)",
+    "container_runtime": "cri-o://1.36.4",
+    "disks": [
+      {
+        "name": "nvme0n1",
+        "model": "KINGSTON SKC3000S512G",
+        "rotational": false,
+        "size_bytes": 512110190592
+      }
+    ]
+  },
+  "kata": {
+    "handler": "kata-qemu-runtime-rs",
+    "overhead": {
+      "cpu": "250m",
+      "memory": "320Mi"
+    },
+    "daemonset_images": [
+      "quay.io/kata-containers/kata-deploy:4.2.0",
+      "quay.io/kata-containers/kata-deploy:4.2.0"
+    ],
+    "csv": null,
+    "config": {
+      "/opt/kata/share/defaults/kata-containers/runtime-rs/configuration-clh-azure-runtime-rs.toml": {
+        "sandbox_cgroup_only": "true",
+        "static_sandbox_resource_mgmt": "true",
+        "shared_fs": "virtio-fs",
+        "virtio_fs_cache": "auto",
+        "default_vcpus": "1",
+        "default_memory": "2048"
+      },
+      "/opt/kata/share/defaults/kata-containers/runtime-rs/configuration-clh-runtime-rs.toml": {
+        "sandbox_cgroup_only": "true",
+        "static_sandbox_resource_mgmt": "true",
+        "shared_fs": "virtio-fs",
+        "virtio_fs_cache": "auto",
+        "default_vcpus": "1",
+        "default_memory": "2048"
+      },
+      "/opt/kata/share/defaults/kata-containers/runtime-rs/configuration-dragonball.toml": {
+        "sandbox_cgroup_only": "true",
+        "static_sandbox_resource_mgmt": "true",
+        "shared_fs": "inline-virtio-fs",
+        "virtio_fs_cache": "auto",
+        "default_vcpus": "1",
+        "default_memory": "2048"
+      },
+      "/opt/kata/share/defaults/kata-containers/runtime-rs/configuration-openvmm-azure-runtime-rs.toml": {
+        "sandbox_cgroup_only": "true",
+        "static_sandbox_resource_mgmt": "true",
+        "shared_fs": "virtio-fs",
+        "virtio_fs_cache": "auto",
+        "default_vcpus": "1",
+        "default_memory": "2048"
+      },
+      "/opt/kata/share/defaults/kata-containers/runtime-rs/configuration-qemu-coco-dev-runtime-rs.toml": {
+        "sandbox_cgroup_only": "true",
+        "static_sandbox_resource_mgmt": "true",
+        "shared_fs": "none",
+        "virtio_fs_cache": "auto",
+        "default_vcpus": "1",
+        "default_memory": "2048"
+      },
+      "/opt/kata/share/defaults/kata-containers/runtime-rs/configuration-qemu-nvidia-cpu-runtime-rs.toml": {
+        "sandbox_cgroup_only": "true",
+        "static_sandbox_resource_mgmt": "true",
+        "shared_fs": "none",
+        "virtio_fs_cache": "auto",
+        "default_vcpus": "1",
+        "default_memory": "2048"
+      },
+      "/opt/kata/share/defaults/kata-containers/runtime-rs/configuration-qemu-nvidia-gpu-runtime-rs.toml": {
+        "sandbox_cgroup_only": "true",
+        "static_sandbox_resource_mgmt": "true",
+        "shared_fs": "none",
+        "virtio_fs_cache": "auto",
+        "default_vcpus": "1",
+        "default_memory": "8192"
+      },
+      "/opt/kata/share/defaults/kata-containers/runtime-rs/configuration-qemu-nvidia-gpu-snp-runtime-rs.toml": {
+        "sandbox_cgroup_only": "true",
+        "static_sandbox_resource_mgmt": "true",
+        "shared_fs": "none",
+        "virtio_fs_cache": "auto",
+        "default_vcpus": "1",
+        "default_memory": "8192"
+      },
+      "/opt/kata/share/defaults/kata-containers/runtime-rs/configuration-qemu-nvidia-gpu-tdx-runtime-rs.toml": {
+        "sandbox_cgroup_only": "true",
+        "static_sandbox_resource_mgmt": "true",
+        "shared_fs": "none",
+        "virtio_fs_cache": "auto",
+        "default_vcpus": "1",
+        "default_memory": "8192"
+      },
+      "/opt/kata/share/defaults/kata-containers/runtime-rs/configuration-qemu-runtime-rs.toml": {
+        "sandbox_cgroup_only": "true",
+        "static_sandbox_resource_mgmt": "true",
+        "shared_fs": "virtio-fs",
+        "virtio_fs_cache": "auto",
+        "default_vcpus": "1",
+        "default_memory": "2048"
+      },
+      "/opt/kata/share/defaults/kata-containers/runtime-rs/configuration-qemu-se-runtime-rs.toml": {
+        "sandbox_cgroup_only": "true",
+        "static_sandbox_resource_mgmt": "true",
+        "shared_fs": "none",
+        "virtio_fs_cache": "auto",
+        "default_vcpus": "1",
+        "default_memory": "2048"
+      },
+      "/opt/kata/share/defaults/kata-containers/runtime-rs/configuration-qemu-snp-runtime-rs.toml": {
+        "sandbox_cgroup_only": "true",
+        "static_sandbox_resource_mgmt": "true",
+        "shared_fs": "none",
+        "virtio_fs_cache": "auto",
+        "default_vcpus": "1",
+        "default_memory": "2048"
+      },
+      "/opt/kata/share/defaults/kata-containers/runtime-rs/configuration-qemu-tdx-runtime-rs.toml": {
+        "sandbox_cgroup_only": "true",
+        "static_sandbox_resource_mgmt": "true",
+        "shared_fs": "none",
+        "virtio_fs_cache": "auto",
+        "default_vcpus": "1",
+        "default_memory": "2048"
+      },
+      "/opt/kata/share/defaults/kata-containers/runtime-rs/configuration-remote.toml": {
+        "sandbox_cgroup_only": "true",
+        "static_sandbox_resource_mgmt": "true",
+        "shared_fs": null,
+        "virtio_fs_cache": null,
+        "default_vcpus": "1",
+        "default_memory": "2048"
+      },
+      "/opt/kata/share/defaults/kata-containers/runtime-rs/configuration-rs-fc.toml": {
+        "sandbox_cgroup_only": "true",
+        "static_sandbox_resource_mgmt": "true",
+        "shared_fs": null,
+        "virtio_fs_cache": null,
+        "default_vcpus": "1",
+        "default_memory": "2048"
+      },
+      "/opt/kata/share/defaults/kata-containers/runtime-rs/configuration.toml": {
+        "sandbox_cgroup_only": "true",
+        "static_sandbox_resource_mgmt": "true",
+        "shared_fs": "virtio-fs",
+        "virtio_fs_cache": "auto",
+        "default_vcpus": "1",
+        "default_memory": "2048"
+      },
+      "/opt/kata/share/defaults/kata-containers/runtime-rs/runtimes/qemu-runtime-rs/configuration-qemu-runtime-rs.toml": {
+        "sandbox_cgroup_only": "true",
+        "static_sandbox_resource_mgmt": "true",
+        "shared_fs": "virtio-fs",
+        "virtio_fs_cache": "auto",
+        "default_vcpus": "1",
+        "default_memory": "2048"
+      }
+    }
+  },
+  "pod": {
+    "cpu": "4",
+    "memory": "4Gi"
+  },
+  "images": {
+    "stress_ng": "ghcr.io/colinianking/stress-ng:72a9d0cae0f420a887991d4024d3101c4af7a4fc@sha256:2ea9a7c3828eda1b1ca3d0b0c5a669ec252f9caf97a6a33aedcea6b2a66d1cbe",
+    "podman": "quay.io/podman/stable:v5.8.7@sha256:74a13ba41b840e83926aa41017fe855c921bf466868f3464a85fc4af5c62503f",
+    "fio": "ghcr.io/smuda/sandboxed-containers/fio:sha-d9f926a8e8b16637c311215fbd6df8505e4ac173@sha256:611749d5b0ebdc0b6684ce4e016d35945bf34625b93585e38d0fe8eb5a4a35d8"
+  },
+  "durations": {
+    "stress_secs": 60,
+    "fio_runtime": 60,
+    "fio_ramp": 10,
+    "fio_size": "1g",
+    "podman_runs": 20,
+    "idle_wait": 30
+  },
+  "repetitions": 3
+}

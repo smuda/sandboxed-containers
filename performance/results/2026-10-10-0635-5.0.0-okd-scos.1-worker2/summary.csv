@@ -6,7 +6,7 @@ plain-runc,stress-ng,idle_cpu_mcores,mcores,lower,3,0,0,0,,
 plain-runc,stress-ng,idle_mem_bytes,bytes,lower,3,606208,598016,610304,,
 plain-runc,stress-ng,matrix_bogo_ops_s,ops/s,higher,3,14642.2,14582.5,14643.1,,
 plain-runc,stress-ng,mem_peak_bytes,bytes,lower,3,4.24632e+07,4.18775e+07,4.25861e+07,,
-plain-runc,stress-ng,stream_bogo_ops_s,ops/s,higher,3,1109.72,1105.21,1112.88,,
+plain-runc,stress-ng,stream_read_mb_s,MB/s,higher,3,5022.74,5002.5,5036.99,,
 plain-runc,fio,cpu_s,s,lower,3,149.549,148.647,151.503,,
 plain-runc,fio,disk_bytes,bytes,lower,3,1.07374e+09,1.07374e+09,1.07374e+09,,
 plain-runc,fio,idle_cpu_mcores,mcores,lower,3,0,0,0,,
@@ -43,7 +43,7 @@ plain-kata,stress-ng,idle_cpu_mcores,mcores,lower,3,4.19527,4.1631,4.22977,0,
 plain-kata,stress-ng,idle_mem_bytes,bytes,lower,3,2.67338e+08,2.66281e+08,2.67575e+08,606208,441.0000
 plain-kata,stress-ng,matrix_bogo_ops_s,ops/s,higher,3,14377.3,14332.5,14442.5,14642.2,0.9819
 plain-kata,stress-ng,mem_peak_bytes,bytes,lower,3,3.28008e+08,3.27913e+08,3.30281e+08,4.24632e+07,7.7245
-plain-kata,stress-ng,stream_bogo_ops_s,ops/s,higher,3,805.626,804.943,808.254,1109.72,0.7260
+plain-kata,stress-ng,stream_read_mb_s,MB/s,higher,3,4864.3,4860.38,4880.31,5022.74,0.9685
 plain-kata,fio,cpu_s,s,lower,3,1146.91,1088.12,1220.4,149.549,7.6691
 plain-kata,fio,disk_bytes,bytes,lower,3,1.07374e+09,1.07374e+09,1.07374e+09,1.07374e+09,1.0000
 plain-kata,fio,idle_cpu_mcores,mcores,lower,3,4.19682,4.14179,4.25501,0,
@@ -89,7 +89,7 @@ podman-runc-overlay-disk,stress-ng,idle_cpu_mcores,mcores,lower,3,0,0,0,,
 podman-runc-overlay-disk,stress-ng,idle_mem_bytes,bytes,lower,3,798720,794624,798720,,
 podman-runc-overlay-disk,stress-ng,matrix_bogo_ops_s,ops/s,higher,3,14556.4,14463,14608.6,,
 podman-runc-overlay-disk,stress-ng,mem_peak_bytes,bytes,lower,3,2.80568e+08,2.78737e+08,2.81821e+08,,
-podman-runc-overlay-disk,stress-ng,stream_bogo_ops_s,ops/s,higher,3,1110.09,1102.19,1110.14,,
+podman-runc-overlay-disk,stress-ng,stream_read_mb_s,MB/s,higher,3,5024.12,4989.25,5024.83,,
 podman-runc-overlay-disk,fio,cpu_s,s,lower,3,158.136,158.065,163.66,,
 podman-runc-overlay-disk,fio,disk_bytes,bytes,lower,3,2.46007e+08,2.46007e+08,2.46007e+08,,
 podman-runc-overlay-disk,fio,idle_cpu_mcores,mcores,lower,3,0,0,0,,
@@ -135,7 +135,7 @@ podman-runc-vfs-disk,stress-ng,idle_cpu_mcores,mcores,lower,3,0,0,0,,
 podman-runc-vfs-disk,stress-ng,idle_mem_bytes,bytes,lower,3,802816,794624,815104,,
 podman-runc-vfs-disk,stress-ng,matrix_bogo_ops_s,ops/s,higher,3,14463.2,14221.7,14618,,
 podman-runc-vfs-disk,stress-ng,mem_peak_bytes,bytes,lower,3,2.85782e+08,2.84697e+08,2.86294e+08,,
-podman-runc-vfs-disk,stress-ng,stream_bogo_ops_s,ops/s,higher,3,1106.37,1104.57,1111.36,,
+podman-runc-vfs-disk,stress-ng,stream_read_mb_s,MB/s,higher,3,5008.08,4999.74,5029.76,,
 podman-runc-vfs-disk,fio,cpu_s,s,lower,3,161.869,161.493,161.887,,
 podman-runc-vfs-disk,fio,disk_bytes,bytes,lower,3,4.23201e+08,4.23201e+08,4.23201e+08,,
 podman-runc-vfs-disk,fio,idle_cpu_mcores,mcores,lower,3,0,0,0,,
@@ -181,7 +181,7 @@ podman-kata-vfs-disk,stress-ng,idle_cpu_mcores,mcores,lower,3,3.99184,3.95602,4.
 podman-kata-vfs-disk,stress-ng,idle_mem_bytes,bytes,lower,3,2.66154e+08,2.65196e+08,2.66682e+08,802816,331.5255
 podman-kata-vfs-disk,stress-ng,matrix_bogo_ops_s,ops/s,higher,3,14328.9,14237.7,14423.6,14463.2,0.9907
 podman-kata-vfs-disk,stress-ng,mem_peak_bytes,bytes,lower,3,7.35257e+08,7.18574e+08,7.50621e+08,2.85782e+08,2.5728
-podman-kata-vfs-disk,stress-ng,stream_bogo_ops_s,ops/s,higher,3,805.178,804.076,806.731,1106.37,0.7278
+podman-kata-vfs-disk,stress-ng,stream_read_mb_s,MB/s,higher,3,4861.09,4854.65,4870.45,5008.08,0.9706
 podman-kata-vfs-disk,fio,cpu_s,s,lower,3,1408.63,1384.81,1424.62,161.869,8.7023
 podman-kata-vfs-disk,fio,disk_bytes,bytes,lower,3,4.23201e+08,4.23201e+08,4.23201e+08,4.23201e+08,1.0000
 podman-kata-vfs-disk,fio,idle_cpu_mcores,mcores,lower,3,4.15964,4.14176,4.40904,0,
@@ -227,7 +227,7 @@ podman-runc-overlay-ram,stress-ng,idle_cpu_mcores,mcores,lower,3,0,0,0,,
 podman-runc-overlay-ram,stress-ng,idle_mem_bytes,bytes,lower,3,819200,802816,823296,,
 podman-runc-overlay-ram,stress-ng,matrix_bogo_ops_s,ops/s,higher,3,14403.2,14264.9,14529.6,,
 podman-runc-overlay-ram,stress-ng,mem_peak_bytes,bytes,lower,3,2.78663e+08,2.75476e+08,2.82206e+08,,
-podman-runc-overlay-ram,stress-ng,stream_bogo_ops_s,ops/s,higher,3,1104.9,1069.83,1113.25,,
+podman-runc-overlay-ram,stress-ng,stream_read_mb_s,MB/s,higher,3,5001.3,4842.81,5038.84,,
 podman-runc-overlay-ram,fio,cpu_s,s,lower,3,563.795,563.758,564.054,,
 podman-runc-overlay-ram,fio,disk_bytes,bytes,lower,3,2.46007e+08,2.46007e+08,2.46007e+08,,
 podman-runc-overlay-ram,fio,idle_cpu_mcores,mcores,lower,3,0,0,0,,
@@ -273,7 +273,7 @@ podman-kata-overlay-ram,stress-ng,idle_cpu_mcores,mcores,lower,3,4.13915,4.10795
 podman-kata-overlay-ram,stress-ng,idle_mem_bytes,bytes,lower,3,2.65871e+08,2.65605e+08,2.66523e+08,819200,324.5500
 podman-kata-overlay-ram,stress-ng,matrix_bogo_ops_s,ops/s,higher,3,14485.4,14409,14509,14403.2,1.0057
 podman-kata-overlay-ram,stress-ng,mem_peak_bytes,bytes,lower,3,7.23079e+08,7.05425e+08,7.29092e+08,2.78663e+08,2.5948
-podman-kata-overlay-ram,stress-ng,stream_bogo_ops_s,ops/s,higher,3,805.55,805.27,806.331,1104.9,0.7291
+podman-kata-overlay-ram,stress-ng,stream_read_mb_s,MB/s,higher,3,4863.4,4861.58,4868.11,5001.3,0.9724
 podman-kata-overlay-ram,fio,cpu_s,s,lower,3,570.658,570.288,570.679,563.795,1.0122
 podman-kata-overlay-ram,fio,disk_bytes,bytes,lower,3,0,0,0,2.46007e+08,0.0000
 podman-kata-overlay-ram,fio,idle_cpu_mcores,mcores,lower,3,4.18949,4.03707,4.31273,0,

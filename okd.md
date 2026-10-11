@@ -312,8 +312,9 @@ The `privileged` SCC binding for the podman pod (section 7) is only
 safe under kata, so the guard goes in before the grant.
 [`okd/02-require-kata.yaml`](okd/02-require-kata.yaml) is a
 ValidatingAdmissionPolicy that rejects any pod create or update in
-`kata-test` without `runtimeClassName: kata`. Its binding selects the
-namespace by label, so it can be applied before `kata-test` exists.
+`kata-test` unless `runtimeClassName` is `kata` or
+`kata-block-emptydir` (section 5). Its binding selects the namespace
+by label, so it can be applied before `kata-test` exists.
 
 The binding takes a few seconds to apply; the first attempts on the
 first run were still admitted. Test with a server-side dry run, so no
@@ -332,7 +333,7 @@ done; echo "$out"
 ```
 
 ```
-Error from server (Forbidden): pods "runc-test" is forbidden: ValidatingAdmissionPolicy 'require-kata-runtimeclass' with binding 'require-kata-runtimeclass-kata-test' denied request: pods in this namespace must use runtimeClassName: kata
+Error from server (Forbidden): pods "runc-test" is forbidden: ValidatingAdmissionPolicy 'require-kata-runtimeclass' with binding 'require-kata-runtimeclass-kata-test' denied request: pods in this namespace must use runtimeClassName: kata or kata-block-emptydir
 ```
 
 A pod with SA `podman`, `privileged: true` and no RuntimeClass gets
@@ -355,6 +356,15 @@ holds the helm values:
   `qemu` is being deprecated upstream.
 - `runtimeClasses.createDefault: true`, giving a RuntimeClass `kata`
   next to `kata-qemu-runtime-rs`
+- `customRuntimes`: an opt-in RuntimeClass `kata-block-emptydir`,
+  `qemu-runtime-rs` with disk emptyDirs on a guest ext4 block device
+  (`emptydir_mode = "block-plain"`) instead of virtio-fs. Much faster
+  writes, but the guest sees the host filesystem size instead of
+  `sizeLimit`, and ext4 metadata can get idle pods evicted
+  ([kata-containers#13310](https://github.com/kata-containers/kata-containers/issues/13310)).
+  The comment in the values file and
+  [performance/results/2026-10-10-1823-5.0.0-okd-scos.1-worker2/analysis.md](performance/results/2026-10-10-1823-5.0.0-okd-scos.1-worker2/analysis.md)
+  have the details.
 - `nodeSelector` on workers
 
 Make sure both MachineConfigPools are `Updated` first, or the nodes
@@ -571,10 +581,11 @@ need no special SCC.
 
 - The `podman` RoleBinding is not limited to kata. Any pod using SA
   `podman` in `kata-test` may be privileged. The policy from section
-  4 makes every pod in `kata-test` use `runtimeClassName: kata`. That
-  keeps privileged in a guest VM only while RuntimeClass `kata`
-  points to a kata handler: anyone who can create or delete
-  RuntimeClasses, or run `helm upgrade` on kata-deploy, can undo it,
+  4 makes every pod in `kata-test` use `runtimeClassName: kata` or
+  `kata-block-emptydir`. That keeps privileged in a guest VM only
+  while both RuntimeClasses point to kata handlers: anyone who can
+  create or delete RuntimeClasses, or run `helm upgrade` on
+  kata-deploy, can undo it,
   and so can anyone with write access to `validatingadmissionpolicies`
   or `validatingadmissionpolicybindings`. The policy checks nothing
   else: hostPath and other host access the `privileged` SCC allows

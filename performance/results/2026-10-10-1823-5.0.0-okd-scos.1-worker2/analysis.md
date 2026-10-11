@@ -77,9 +77,11 @@ block-plain halves the node CPU for disk I/O (7.7-8.7x runc down to
 4.0-4.1x) and removes most of the double caching (peak memory 1.43x
 runc, was 2.29x). The price is about 57 MB and 30 mcores more per idle
 pod with a disk emptyDir; the overlay-RAM Setup, which has no block
-emptyDir, stays at 265 MB and 4 mcores. The idle CPU is a guess
-until measured: ext4 lazy inode-table init on an image the size of
-the host filesystem (511 GB apparent).
+emptyDir, stays at 265 MB and 4 mcores. The idle CPU is most likely
+the guest's ext4 lazy inode-table init on an image the size of the
+host filesystem (511 GB apparent), as reported upstream in
+[kata#13310](https://github.com/kata-containers/kata-containers/issues/13310);
+not measured here.
 
 `disk_bytes` now counts allocated blocks, so the kata emptyDir shows
 its real use (1.08 GB for fio against 1.07 GB for runc).
@@ -95,8 +97,8 @@ its real use (1.08 GB for fio against 1.07 GB for runc).
 
 The layer copies that vfs makes now go to ext4 on a block device
 inside the guest instead of across virtio-fs. kata+vfs is still 2.2x
-slower to build than runc+overlay (8.1 s), which is the
-cost of vfs itself. With a real ext4 in the guest, overlay storage
+slower to build than runc+overlay (8.1 s), which is the cost of vfs
+itself. With a real ext4 in the guest, overlay storage
 inside kata may now work on disk too; not tested.
 
 Nested fio in podman-kata-vfs-disk now matches plain-kata within a few
@@ -113,40 +115,96 @@ sequential writes), podman-ops build 1.74x, `run --rm` 2.6x, pull
 
 ## Operational consequences of block-plain
 
-Tested on worker2 on 2026-10-11 with a kata and a runc pod, two
-containers each, sharing one emptyDir with `sizeLimit: 200Mi`.
+The benchmark shows what block-plain does to throughput. For running
+it, what matters more is that a disk emptyDir stops being a directory
+on the node and becomes a disk inside the VM. That changes how much
+space the container sees, how limits are enforced, who can look at the
+data and what an idle pod costs. We tested the most important points
+on worker2 on 2026-10-11 with a kata and a runc pod, each with two
+containers sharing one emptyDir with `sizeLimit: 200Mi`; the rest
+comes from the kata source and upstream issues, linked where used.
 
-- `sizeLimit` is still enforced. Writing 400 MiB got both pods
-  evicted about 40 s later with the same message: "Usage of EmptyDir
-  volume "data" exceeds the limit "200Mi"". kubelet sees the image's
-  allocated blocks grow. As under runc, the limit is an eviction, not
-  ENOSPC.
-- The container no longer sees the node's filesystem. `df /data` in
-  kata shows a 476 GB ext4 on `/dev/vda`, nearly empty; under runc it
-  shows the node's XFS with its real usage (43 GB used). Free space in
-  the guest is the image size, not what the node has left. Inference,
-  not tested: if the node disk fills up first, the guest gets I/O
-  errors on the block device instead of ENOSPC.
-- The data is not visible from the node. The emptyDir directory on
-  the node holds one `disk.img` (511 GB apparent, 9.9 MB allocated
-  when fresh); debugging or collecting files from the node side no
-  longer works, only through the pod.
-- Containers in the same pod still share the emptyDir: a file written
-  by one container was readable in the other.
-- Space is given back. The guest mounts with `discard`: after writing
-  and deleting 300 MiB, allocation went from 324 MB back to 9.9 MB.
-- Every disk emptyDir in a kata pod costs a hot-plugged block device,
-  about 57 MB of memory and 30 mcores while idle (see Footprint).
-- O_DIRECT in the guest now reaches the NVMe and buffered I/O is
-  cached in guest RAM only, inside the pod's memory limit; the node
-  page cache no longer holds a second copy.
-- The drop-in is shim-wide: every pod using `kata` or
-  `kata-qemu-runtime-rs` gets block-plain emptyDirs. There is no
-  per-pod opt-out; a separate RuntimeClass (kata-deploy
-  `customRuntimes`) would be needed for that.
-- It depends on `block_device_aio = "native"`: with the default
-  `io_uring`, every kata pod with a disk emptyDir fails to start on
-  SCOS (`kernel.io_uring_disabled = 2`).
+### What keeps working
+
+From inside the pod, block-plain behaves like an ordinary emptyDir.
+Containers in the same pod share it: a file written by one container
+was readable in the other. Deleted data gives its space back to the
+node, because the guest mounts the filesystem with `discard`; after
+writing and deleting 300 MiB, the image's allocation went from 324 MB
+back to 9.9 MB.
+
+`sizeLimit` is also still enforced, in the same way as under runc.
+Writing 400 MiB into the 200Mi emptyDir got both pods evicted about
+40 s later with the same message: "Usage of EmptyDir volume "data"
+exceeds the limit "200Mi"". kubelet measures the allocated blocks of
+`disk.img` on the node and sees them grow like any other file. In
+neither runtime is the limit a full disk: the write succeeds, and
+kubelet evicts the pod afterwards.
+
+### The disk the guest sees is the size of the node's filesystem
+
+What the container can no longer see is the limit, or the node. `df
+/data` in kata shows a 476 GB ext4 on `/dev/vda`, nearly empty, where
+runc shows the node's XFS with its real usage (43 GB used). The free
+space reported in the guest is the size of the image, not what the
+node has left. We did not test it, but if the node disk fills up
+first, the guest should get I/O errors from its block device rather
+than a clean ENOSPC.
+
+Making the guest disk match `sizeLimit` is not possible in kata 4.2.0.
+The shim sizes `disk.img` from `statfs()` of the emptyDir directory,
+which is the host filesystem
+([block_emptydir_volume.rs](https://github.com/kata-containers/kata-containers/blob/4.2.0/src/runtime-rs/crates/resource/src/volume/block_emptydir_volume.rs)).
+`sizeLimit` exists only in the pod spec; neither CRI nor OCI passes it
+to the runtime. Upstream issue
+[kata#13310](https://github.com/kata-containers/kata-containers/issues/13310)
+(open) discusses handing it over in a pod annotation, which is not
+implemented and is treated with caution, because annotations have been
+an attack vector in kata. Today, a size the guest actually sees needs a
+generic ephemeral volume from a local block CSI driver (for example
+LVM Storage) instead of an emptyDir; kata hot-plugs that device at its
+requested size. This cluster only has `nfs-csi`.
+
+### An idle pod can be evicted by filesystem metadata
+
+The large image has a cost of its own, also described in
+[kata#13310](https://github.com/kata-containers/kata-containers/issues/13310).
+The guest formats the image as ext4 and initialises the inode tables
+lazily in the background. That allocates about 0.08% of the image size
+on the node, roughly 400 MB for our 511 GB image, without the pod
+writing anything. kubelet counts it as emptyDir usage, so a pod with a
+small `sizeLimit`, like the 200Mi in our test, can be evicted while
+idle. Our test pod showed 9.9 MB right after start and was not watched
+long enough to see the growth. The same background work is the most
+likely source of the extra idle CPU in the Footprint section. A fix is
+proposed upstream behind a `[runtime]` flag that mounts the image with
+`noinit_itable`, which brings an empty volume down to about 13 MB
+([kata#13977](https://github.com/kata-containers/kata-containers/pull/13977),
+open).
+
+### The data lives inside the VM
+
+On the node, the emptyDir directory now holds a single `disk.img`
+(511 GB apparent, 9.9 MB allocated when fresh). Inspecting, copying
+or collecting files from the node side no longer works; the files are
+only reachable through the pod. The same goes for the page cache:
+O_DIRECT in the guest reaches the NVMe, and buffered data is cached
+only in guest RAM, inside the pod's memory limit, instead of twice
+(guest and node) as with virtio-fs.
+
+Each disk emptyDir in a kata pod is a hot-plugged block device. With
+the image comes a fixed cost of about 57 MB of memory and 30 mcores
+of CPU per idle pod (see Footprint).
+
+### Rolling it out
+
+The setting is per shim, not per pod. With the drop-in in place, every
+pod using `kata` or `kata-qemu-runtime-rs` gets block-plain emptyDirs,
+and there is no per-pod opt-out; offering both would take a separate
+RuntimeClass (kata-deploy `customRuntimes`). The drop-in also has to
+set `block_device_aio = "native"`: with the default `io_uring`, every
+kata pod with a disk emptyDir fails to start on SCOS, which sets
+`kernel.io_uring_disabled = 2`.
 
 ## Caveats
 

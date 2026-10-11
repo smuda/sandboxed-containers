@@ -28,7 +28,9 @@ What differs from
   the run.
 - kata-deploy helm revision 3 adds a drop-in for the qemu-runtime-rs
   shim, from
-  [okd/experimental/block-emptydir-values.yaml](../../../okd/experimental/block-emptydir-values.yaml),
+  [okd/experimental/block-emptydir-values.yaml](https://github.com/smuda/sandboxed-containers/blob/cd45369e9c73b79c367d992793125afbf118c540/okd/experimental/block-emptydir-values.yaml)
+  (since removed; now the opt-in RuntimeClass `kata-block-emptydir`
+  in [okd/04-kata-deploy-values.yaml](../../../okd/04-kata-deploy-values.yaml)),
   written to `config.d/50-user-overrides.toml`:
 
   ```toml

@@ -28,6 +28,12 @@ Progress:
   worked on the first try: no reboot for the MachineConfig, and the
   kata-deploy pods went straight to `1/1 Running` without the
   `append` denial.
+- 2026-10-12: the block-plain + iothread drop-in became the default
+  for `kata` (section 5), installed and benchmarked on the reinstalled
+  OKD 4.22 cluster (run 2219). The opt-in RuntimeClass
+  `kata-block-emptydir` is gone. Run 2219 still had it installed; a
+  `helm upgrade` to the current values (revision 2) then removed its
+  CRI-O handler and RuntimeClass, and section 6 was re-run on it.
 - Not done: no kata pod on worker1 (see Known issues) and `helm
   uninstall` never run.
 
@@ -312,9 +318,9 @@ The `privileged` SCC binding for the podman pod (section 7) is only
 safe under kata, so the guard goes in before the grant.
 [`okd/02-require-kata.yaml`](okd/02-require-kata.yaml) is a
 ValidatingAdmissionPolicy that rejects any pod create or update in
-`kata-test` unless `runtimeClassName` is `kata` or
-`kata-block-emptydir` (section 5). Its binding selects the namespace
-by label, so it can be applied before `kata-test` exists.
+`kata-test` unless `runtimeClassName` is `kata`. Its binding selects
+the namespace by label, so it can be applied before `kata-test`
+exists.
 
 The binding takes a few seconds to apply; the first attempts on the
 first run were still admitted. Test with a server-side dry run, so no
@@ -333,7 +339,7 @@ done; echo "$out"
 ```
 
 ```
-Error from server (Forbidden): pods "runc-test" is forbidden: ValidatingAdmissionPolicy 'require-kata-runtimeclass' with binding 'require-kata-runtimeclass-kata-test' denied request: pods in this namespace must use runtimeClassName: kata or kata-block-emptydir
+Error from server (Forbidden): pods "runc-test" is forbidden: ValidatingAdmissionPolicy 'require-kata-runtimeclass' with binding 'require-kata-runtimeclass-kata-test' denied request: pods in this namespace must use runtimeClassName: kata
 ```
 
 A pod with SA `podman`, `privileged: true` and no RuntimeClass gets
@@ -356,15 +362,12 @@ holds the helm values:
   `qemu` is being deprecated upstream.
 - `runtimeClasses.createDefault: true`, giving a RuntimeClass `kata`
   next to `kata-qemu-runtime-rs`
-- `customRuntimes`: an opt-in RuntimeClass `kata-block-emptydir`,
-  `qemu-runtime-rs` with disk emptyDirs on a guest ext4 block device
-  (`emptydir_mode = "block-plain"`) instead of virtio-fs. Much faster
-  writes, but the guest sees the host filesystem size instead of
-  `sizeLimit`, and ext4 metadata can get idle pods evicted
-  ([kata-containers#13310](https://github.com/kata-containers/kata-containers/issues/13310)).
-  The comment in the values file and
-  [performance/results/2026-10-10-1823-5.0.0-okd-scos.1-worker2/analysis.md](performance/results/2026-10-10-1823-5.0.0-okd-scos.1-worker2/analysis.md)
-  have the details.
+- `shims.qemu-runtime-rs.dropIn`: a drop-in on the shim itself, so
+  the default RuntimeClass `kata` gets it. Disk emptyDirs sit on a
+  guest ext4 block device (`emptydir_mode = "block-plain"`) instead
+  of virtio-fs, on virtio-blk with direct I/O, native aio and a qemu
+  iothread. "Why these kata settings" below explains each line and
+  the caveats.
 - `nodeSelector` on workers
 
 Make sure both MachineConfigPools are `Updated` first, or the nodes
@@ -397,6 +400,141 @@ Kata Containers installation completed successfully
 CRI-O restarts without making the nodes `NotReady`, and `ausearch -m
 AVC -ts recent | grep kata_deploy` on the workers comes back empty.
 
+### Why these kata settings
+
+The drop-in is written to `config.d/50-user-overrides.toml` of the
+`qemu-runtime-rs` shim:
+
+```toml
+[hypervisor.qemu]
+block_device_driver = "virtio-blk-pci"
+block_device_cache_direct = true
+block_device_aio = "native"
+enable_iothreads = true
+indep_iothreads = 1
+
+[runtime]
+emptydir_mode = "block-plain"
+```
+
+The numbers are kata median over runc median (Baseline) on worker2
+(i7-10710U, 12 CPUs, 62 GiB, NVMe), pods of 4 CPU / 4Gi, 3
+repetitions. Sources, in order:
+[stock virtio-fs, run 0635](performance/results/2026-10-10-0635-5.0.0-okd-scos.1-worker2/analysis.md);
+[block-plain, run 1823](performance/results/2026-10-10-1823-5.0.0-okd-scos.1-worker2/analysis.md)
+([changes](performance/results/2026-10-10-1823-5.0.0-okd-scos.1-worker2/changes.md));
+[block-plain with iothread, run 2219](performance/results/2026-10-11-2219-4.22.0-okd-scos.9-worker2/analysis.md)
+([changes](performance/results/2026-10-11-2219-4.22.0-okd-scos.9-worker2/changes.md),
+effective settings in its
+[config/](performance/results/2026-10-11-2219-4.22.0-okd-scos.9-worker2/config/));
+[OCP comparison, run 1147](performance/results/2026-10-11-1147-ocp-4.22.17-worker2/analysis.md).
+Run 2219 is the current configuration.
+
+- `emptydir_mode = "block-plain"`: runtime-rs creates a sparse
+  `disk.img` in the emptyDir, hot-plugs it and the guest mounts it as
+  ext4, so disk emptyDirs no longer cross virtio-fs. With the stock
+  virtio-fs path, buffered 4k random writes ran at 0.14 of runc and
+  the nested podman build on vfs at 4.15x runc. With block-plain they
+  are 1.07 and 1.50x (run 2219). Node CPU during fio fell from
+  7.7-8.7x runc to 4.0-4.6x.
+- `block_device_driver = "virtio-blk-pci"`: the default was
+  `virtio-scsi`. It was changed together with block-plain, so its
+  effect alone was not measured; the iothread below is set up for
+  virtio-blk devices.
+- `block_device_cache_direct = true`: guest O_DIRECT reaches the
+  NVMe. With virtio-fs, virtiofsd dropped O_DIRECT, so kata "direct"
+  reads (2.3x runc) measured the node page cache, not the device.
+  After the change the direct rows are device against device.
+- `block_device_aio = "native"`: the default `io_uring` makes the
+  block device hotplug fail on SCOS, which sets
+  `kernel.io_uring_disabled = 2`, and every kata pod with a disk
+  emptyDir then fails to start. `native` needs `cache_direct = true`.
+- `enable_iothreads = true`, `indep_iothreads = 1`: one dedicated
+  qemu iothread for the hot-plugged virtio-blk devices, so their I/O
+  is not handled in qemu's main loop. The fixed cost per 4k I/O at
+  queue depth 1 fell from 26-32 µs to 7-10 µs: 4k direct writes went
+  from 0.25 to 0.51 of runc and 4k reads from 0.62 to 0.87. The price
+  is about 12-15% more node CPU under fio (kata also did 1.4x the
+  reads and 2.1x the direct writes in the same time) and nothing at
+  idle. The iothread is the likely cause, not a proven one: OKD,
+  CRI-O and the host kernel changed in the same step, and that the
+  disk is attached to the iothread was not checked. An A/B without
+  the two lines on this cluster is still open.
+- Left at the defaults: the `qemu-runtime-rs` shim (the Go `qemu`
+  shim is being deprecated), `static_sandbox_resource_mgmt = true`
+  and debug off.
+
+Why the OCP settings were not copied
+([run 1147](performance/results/2026-10-11-1147-ocp-4.22.17-worker2/analysis.md)):
+
+- `static_sandbox_resource_mgmt = false` (hotplug sizing) left 1-3 of
+  5 vCPUs online in 4 of 9 stress-ng pods, which halved their CPU
+  throughput, and an idle pod cost about 500 MB against 265 MB.
+  Static sizing has neither problem.
+- `disable_guest_empty_dir = false` puts the emptyDir in the sandbox
+  overlay. Its fast large writes (3.2 GB/s "direct", more than the
+  NVMe does) are the host page cache and probably not durable. The
+  option only exists in the Go runtime, which is being deprecated.
+- The OCP configuration has `enable_debug = true` in the hypervisor,
+  agent and runtime sections.
+
+Current ratios against runc on a block-plain emptyDir (run 2219):
+
+| access pattern | virtio-fs (0635) | block-plain (1823) | plus iothread (2219) |
+|-|-|-|-|
+| buffered 4k random writes | 0.14 | 1.11 | 1.07 |
+| 1 MiB direct writes | 0.35 | 0.89 | 0.95 |
+| small random reads, cold | 2.3 (page cache) | 0.62 | 0.86-0.87 |
+| 1 MiB reads | 1.26-2.39 (page cache) | 0.73-0.87 | 0.78-0.84 |
+| 4k direct writes | 0.57 (page cache) | 0.25 | 0.51 |
+| buffered streaming writes | 0.13 | 0.46 | 0.47 |
+
+Footprint and compute (run 2219): an idle pod uses about 314-324 MB
+and 32-37 mcores of CPU with a disk emptyDir (runc: under 1 MB and
+about 0). Stock virtio-fs was 265 MB and 4 mcores; the 57 MB and 30
+mcores extra come with the block device (the CPU is most likely
+ext4 lazy inode-table init). CPU and memory bandwidth are about 1.0
+of runc. Nested podman on vfs: build 1.50x, `run --rm` 0.93x, pull
+1.10x. A tmpfs emptyDir (`medium: Memory`) is not affected.
+
+Caveats of block-plain now apply to every kata pod. They were the
+reason it was an opt-in RuntimeClass before; it is the default by
+choice, for the performance above.
+
+- ext4 lazy init allocates about 0.08% of the host filesystem per
+  emptyDir (roughly 400 MB for the 476 GiB image). kubelet counts
+  that against `sizeLimit`, so an idle pod with a small `sizeLimit`
+  can be evicted
+  ([kata-containers#13310](https://github.com/kata-containers/kata-containers/issues/13310),
+  measured in run 1823). Give emptyDirs a generous `sizeLimit`, but
+  always set one: the image is as large as the host filesystem, so
+  without a limit one pod can fill the worker's `/var`.
+- The guest sees the host filesystem's size (476 GiB in the test),
+  not `sizeLimit`. kubelet still enforces the limit by eviction, as
+  with runc, but it polls: run 1823 saw about 40 s of lag, so a pod
+  writing at disk speed can overshoot the limit by tens of GB.
+- The files are not visible individually from the host: the emptyDir
+  directory holds one sparse `disk.img`. It is not encrypted; host
+  root can still read the image.
+- Anything outside an emptyDir, the container's own filesystem,
+  still goes over virtio-fs at 0.14 of runc for buffered writes.
+- There is no per-pod opt-out. A second RuntimeClass would need
+  `customRuntimes`.
+
+Deleted files give their space back. The guest mounts the emptyDir
+with `discard` (`/dev/vda on /data type ext4 (rw,relatime,discard)`),
+so a delete punches holes in `disk.img` right away. Observed with
+`du -k` on the host, in a fresh kata pod with a 4Gi `sizeLimit`:
+
+| step | `disk.img` allocated |
+|-|-|
+| empty | 9.4 MiB |
+| after writing 1 GiB with `conv=fsync` | 1033 MiB |
+| after `rm` and `sync` | 9.4 MiB |
+
+So usage does not only grow, and workloads that churn temp files are
+charged for what they hold, not for what they ever wrote.
+
 ## 6. Verify the install
 
 ```sh
@@ -410,12 +548,14 @@ for n in worker1 worker2; do
     grep privileged_without_host_devices \
     /etc/crio/crio.conf.d/99-kata-deploy 2>/dev/null
 done
+oc debug node/worker2.okd4.example.com -q -- chroot /host cat \
+  /var/opt/kata/share/defaults/kata-containers/runtime-rs/runtimes/qemu-runtime-rs/config.d/50-user-overrides.toml
 ```
 
 Observed (trimmed):
 
 ```
-kata-deploy  kata-deploy  1  deployed  kata-deploy-4.2.0  4.2.0
+kata-deploy  kata-deploy  2  deployed  kata-deploy-4.2.0  4.2.0
 kata-deploy   2 2 2 2 2   node-role.kubernetes.io/worker=
 worker1.okd4.example.com   Ready  worker  ...  true  true
 worker2.okd4.example.com   Ready  worker  ...  true  true
@@ -443,6 +583,20 @@ The masters are not labelled. On each worker the CRI-O drop-in
         runtime_config_path = "/opt/kata/share/defaults/kata-containers/runtime-rs/runtimes/qemu-runtime-rs/configuration-qemu-runtime-rs.toml"
         privileged_without_host_devices = true
 ```
+
+The shim drop-in from section 5 must be in place on each worker. The
+`cat` above prints the same seven lines as the TOML in "Why these
+kata settings" (observed on both workers after the `helm upgrade`,
+byte for byte the same as run 2219's
+[50-user-overrides.toml](performance/results/2026-10-11-2219-4.22.0-okd-scos.9-worker2/config/50-user-overrides.toml)).
+An empty or missing file means the pods still get virtio-fs
+emptyDirs.
+
+Upgrading from the values with `kata-block-emptydir`: the upgrade
+removes the RuntimeClass and the CRI-O handler (`99-kata-deploy` is
+back to the 402 bytes above), but leaves the directory
+`/var/opt/kata/share/defaults/kata-containers/custom-runtimes/kata-block-emptydir/`
+on the nodes. Nothing refers to it any more; it is harmless.
 
 kata-deploy also writes an empty `100-debug`. The kata files live in
 `/var/opt/kata` (`usr_t`) and `getenforce` stays `Enforcing`; no
@@ -581,9 +735,9 @@ need no special SCC.
 
 - The `podman` RoleBinding is not limited to kata. Any pod using SA
   `podman` in `kata-test` may be privileged. The policy from section
-  4 makes every pod in `kata-test` use `runtimeClassName: kata` or
-  `kata-block-emptydir`. That keeps privileged in a guest VM only
-  while both RuntimeClasses point to kata handlers: anyone who can
+  4 makes every pod in `kata-test` use `runtimeClassName: kata`. That
+  keeps privileged in a guest VM only while that RuntimeClass points
+  to a kata handler: anyone who can
   create or delete RuntimeClasses, or run `helm upgrade` on
   kata-deploy, can undo it,
   and so can anyone with write access to `validatingadmissionpolicies`

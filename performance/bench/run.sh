@@ -295,8 +295,14 @@ snapshot() { # pod -> one JSON line, read from the node via the probe
     cpu=$(sed -n "s/^usage_usec //p" "$d/cpu.stat")
     cur=$(cat "$d/memory.current")
     peak=$(cat "$d/memory.peak" 2>/dev/null || echo 0)
+    # OCP (disable_guest_empty_dir = false) keeps disk emptyDirs in the
+    # sandbox container overlay layer, under diff/local, not in kubelet dir.
+    sb=$(grep -l "\"io.kubernetes.pod.uid\": *\"$1\"" /host/var/lib/containers/storage/overlay-containers/*/userdata/config.json 2>/dev/null |
+      xargs -r grep -l "\"io.kubernetes.cri-o.ContainerType\": *\"sandbox\"" | head -n1)
+    mp=$([ -z "$sb" ] || sed -n "s/.*\"io.kubernetes.cri-o.MountPoint\": *\"\([^\"]*\)\".*/\1/p" "$sb")
     # Allocated, not apparent: kata block-plain puts a sparse host-FS-sized image here.
-    disk=$(du -sk "/host/var/lib/kubelet/pods/$1/volumes/kubernetes.io~empty-dir/" 2>/dev/null | awk "{ print \$1 * 1024 }")
+    disk=$(du -sk "/host/var/lib/kubelet/pods/$1/volumes/kubernetes.io~empty-dir/" ${mp:+"/host${mp%/merged}/diff/local"} 2>/dev/null |
+      awk "{ s += \$1 } END { if (NR) print s * 1024 }")
     printf "{\"t\":%s,\"cpu_usec\":%s,\"mem_current\":%s,\"mem_peak\":%s,\"disk_bytes\":%s}\n" \
       "$(date +%s.%N)" "$cpu" "$cur" "$peak" "$disk"
   ' _ "$uid") || return 1

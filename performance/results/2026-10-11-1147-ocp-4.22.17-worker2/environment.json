@@ -1,0 +1,117 @@
+{
+  "date": "2026-10-11T09:47:46Z",
+  "cluster": {
+    "flavour": "ocp",
+    "version": "4.22.17"
+  },
+  "node": {
+    "name": "worker2.okd4.example.com",
+    "cpu_model": "Intel(R) Core(TM) i7-10710U CPU @ 1.10GHz",
+    "cpus": 12,
+    "mem_total_kib": 65547488,
+    "kernel": "5.14.0-687.53.1.el9_8.x86_64",
+    "os_image": "Red Hat Enterprise Linux CoreOS 9.8.20260929-0 (Plow)",
+    "container_runtime": "cri-o://1.35.9-12.rhaos4.22.git4c168db.el9",
+    "disks": [
+      {
+        "name": "nvme0n1",
+        "model": "KINGSTON SKC3000S512G",
+        "rotational": false,
+        "size_bytes": 512110190592
+      }
+    ]
+  },
+  "kata": {
+    "handler": "kata",
+    "overhead": {
+      "cpu": "250m",
+      "memory": "350Mi"
+    },
+    "daemonset_images": [],
+    "csv": "sandboxed-containers-operator.v1.13.1",
+    "config": {
+      "/etc/kata-containers/configuration.toml": {
+        "sandbox_cgroup_only": "true",
+        "static_sandbox_resource_mgmt": "false",
+        "shared_fs": "virtio-fs",
+        "virtio_fs_cache": "auto",
+        "default_vcpus": "1",
+        "default_memory": "2048"
+      },
+      "/etc/kata-containers/kata-nvidia-gpu/configuration.toml": {
+        "sandbox_cgroup_only": "true",
+        "static_sandbox_resource_mgmt": "true",
+        "shared_fs": "virtio-fs",
+        "virtio_fs_cache": "auto",
+        "default_vcpus": "1",
+        "default_memory": "8192"
+      },
+      "/etc/kata-containers/kata-se/configuration.toml": {
+        "sandbox_cgroup_only": "true",
+        "static_sandbox_resource_mgmt": "false",
+        "shared_fs": "none",
+        "virtio_fs_cache": "auto",
+        "default_vcpus": "1",
+        "default_memory": "2048"
+      },
+      "/etc/kata-containers/kata-snp-nvidia-gpu/configuration.toml": {
+        "sandbox_cgroup_only": "true",
+        "static_sandbox_resource_mgmt": "true",
+        "shared_fs": "none",
+        "virtio_fs_cache": "auto",
+        "default_vcpus": "1",
+        "default_memory": "8192"
+      },
+      "/etc/kata-containers/kata-snp/configuration.toml": {
+        "sandbox_cgroup_only": "true",
+        "static_sandbox_resource_mgmt": "true",
+        "shared_fs": "none",
+        "virtio_fs_cache": "auto",
+        "default_vcpus": "1",
+        "default_memory": "2048"
+      },
+      "/etc/kata-containers/kata-tdx-nvidia-gpu/configuration.toml": {
+        "sandbox_cgroup_only": "true",
+        "static_sandbox_resource_mgmt": "true",
+        "shared_fs": "none",
+        "virtio_fs_cache": "auto",
+        "default_vcpus": "1",
+        "default_memory": "8192"
+      },
+      "/etc/kata-containers/kata-tdx/configuration.toml": {
+        "sandbox_cgroup_only": "true",
+        "static_sandbox_resource_mgmt": "true",
+        "shared_fs": "none",
+        "virtio_fs_cache": "auto",
+        "default_vcpus": "1",
+        "default_memory": "2048"
+      },
+      "/etc/kata-containers/remote/configuration.toml": {
+        "sandbox_cgroup_only": "true",
+        "static_sandbox_resource_mgmt": "true",
+        "shared_fs": null,
+        "virtio_fs_cache": null,
+        "default_vcpus": null,
+        "default_memory": null
+      }
+    }
+  },
+  "pod": {
+    "cpu": "4",
+    "memory": "4Gi"
+  },
+  "images": {
+    "stress_ng": "ghcr.io/colinianking/stress-ng:72a9d0cae0f420a887991d4024d3101c4af7a4fc@sha256:2ea9a7c3828eda1b1ca3d0b0c5a669ec252f9caf97a6a33aedcea6b2a66d1cbe",
+    "podman": "quay.io/podman/stable:v5.8.7@sha256:74a13ba41b840e83926aa41017fe855c921bf466868f3464a85fc4af5c62503f",
+    "fio": "ghcr.io/smuda/sandboxed-containers/fio:sha-d9f926a8e8b16637c311215fbd6df8505e4ac173@sha256:611749d5b0ebdc0b6684ce4e016d35945bf34625b93585e38d0fe8eb5a4a35d8"
+  },
+  "durations": {
+    "stress_secs": 60,
+    "fio_runtime": 60,
+    "fio_ramp": 10,
+    "fio_size": "1g",
+    "podman_runs": 20,
+    "idle_wait": 30
+  },
+  "repetitions": 3
+}

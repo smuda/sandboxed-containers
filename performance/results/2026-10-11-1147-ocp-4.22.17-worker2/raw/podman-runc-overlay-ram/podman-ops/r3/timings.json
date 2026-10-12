@@ -1,0 +1,6 @@
+{
+  "pull_stress_ng_s": 2.761,
+  "pull_podman_s": 8.825,
+  "build_s": 7.943,
+  "run_rm_mean_s": 0.060
+}

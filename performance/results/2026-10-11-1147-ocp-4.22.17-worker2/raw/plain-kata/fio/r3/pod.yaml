@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bench-plain-kata-fio-r3
+  namespace: kata-bench
+  annotations:
+    openshift.io/required-scc: privileged
+spec:
+  serviceAccountName: bench
+  automountServiceAccountToken: false
+  restartPolicy: Never
+  terminationGracePeriodSeconds: 0
+  activeDeadlineSeconds: 7200
+  # nodeName would skip the scheduler, which applies the RuntimeClass overhead.
+  nodeSelector:
+    kubernetes.io/hostname: "worker2.okd4.example.com"
+  runtimeClassName: kata
+  containers:
+    - name: bench
+      image: ghcr.io/smuda/sandboxed-containers/fio:sha-d9f926a8e8b16637c311215fbd6df8505e4ac173@sha256:611749d5b0ebdc0b6684ce4e016d35945bf34625b93585e38d0fe8eb5a4a35d8
+      command: ["sleep", "infinity"]
+      resources:
+        requests: {cpu: "4", memory: 4Gi}
+        limits: {cpu: "4", memory: 4Gi}
+      securityContext:
+        runAsUser: 0
+        privileged: false
+      volumeMounts:
+        - {name: data, mountPath: /bench}
+  volumes:
+    - name: data
+      emptyDir: {sizeLimit: 3Gi}

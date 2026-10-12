@@ -1,0 +1,151 @@
+---
+build-info:
+      compiler: 'gcc 14.2.0'
+      stdc-version: '199901L'
+      stdc-hosted: '1'
+
+system-info:
+      stress-ng-version: '0.22.01'
+      run-by: 'unknown'
+      date-yyyy-mm-dd: '2026:10:11'
+      time-hh-mm-ss: '11:49:48'
+      epoch-secs: 1791719388
+      hostname: 'bench-plain-kata-stressng-r2'
+      sysname: 'Linux'
+      nodename: 'bench-plain-kata-stressng-r2'
+      release: '5.14.0-687.53.1.el9_8.x86_64'
+      version: '#1 SMP PREEMPT_DYNAMIC Sun Sep 27 21:13:58 EDT 2026'
+      machine: 'x86_64'
+      compiler: 'gcc 14.2.0'
+      libc: 'glibc 2.41'
+      uptime: 156
+      totalram: 6282989568
+      freeram: 6004670464
+      sharedram: 94695424
+      bufferram: 0
+      totalswap: 0
+      freeswap: 0
+      pagesize: 4096
+      cpus: 12
+      cpus-online: 2
+      ticks-per-second: 100
+
+metrics:
+    - stressor: matrix
+      bogo-ops: 454192
+      bogo-ops-per-second-usr-sys-time: 3797.792850
+      bogo-ops-per-second-real-time: 7570.056656
+      wall-clock-time: 59.998494
+      user-time: 119.592686
+      system-time: 0.000988
+      cpu-usage-per-instance: 49.831948
+      max-rss: 2976
+      add-matrix-ops-per-sec: 143451.149585
+      copy-matrix-ops-per-sec: 273830.208710
+      div-matrix-ops-per-sec: 165593.895248
+      frobenius-matrix-ops-per-sec: 29391.426155
+      hadamard-matrix-ops-per-sec: 283439.279728
+      identity-matrix-ops-per-sec: 164414.608291
+      mean-matrix-ops-per-sec: 234612.754886
+      mult-matrix-ops-per-sec: 303864.306470
+      negate-matrix-ops-per-sec: 395637.990016
+      prod-matrix-ops-per-sec: 278.284830
+      sub-matrix-ops-per-sec: 164742.001757
+      square-matrix-ops-per-sec: 270.670321
+      trans-matrix-ops-per-sec: 44569.651593
+      zero-matrix-ops-per-sec: 330769.812769
+      instances:
+          - instance: 0
+            bogo-ops: 113762
+            bogo-ops-per-second-usr-sys-time: 3803.853032
+            bogo-ops-per-second-real-time: 1895.910248
+            wall-clock-time: 60.003895
+            user-time: 29.907044
+            system-time: 0.000000
+            cpu-usage: 49.841838
+            max-rss: 2976
+            add-matrix-ops-per-sec: 144550.816651
+            copy-matrix-ops-per-sec: 133510.840185
+            div-matrix-ops-per-sec: 261693.138084
+            frobenius-matrix-ops-per-sec: 28968.078601
+            hadamard-matrix-ops-per-sec: 262784.711555
+            identity-matrix-ops-per-sec: 153964.955658
+            mean-matrix-ops-per-sec: 244428.849203
+            mult-matrix-ops-per-sec: 312859.503433
+            negate-matrix-ops-per-sec: 247612.820598
+            prod-matrix-ops-per-sec: 276.572869
+            sub-matrix-ops-per-sec: 260429.383703
+            square-matrix-ops-per-sec: 273.268133
+            trans-matrix-ops-per-sec: 39198.471570
+            zero-matrix-ops-per-sec: 463517.314545
+          - instance: 1
+            bogo-ops: 113076
+            bogo-ops-per-second-usr-sys-time: 3789.254122
+            bogo-ops-per-second-real-time: 1884.505482
+            wall-clock-time: 60.003009
+            user-time: 29.841229
+            system-time: 0.000000
+            cpu-usage: 49.732887
+            max-rss: 2848
+            add-matrix-ops-per-sec: 130636.316482
+            copy-matrix-ops-per-sec: 301864.911367
+            div-matrix-ops-per-sec: 93661.320837
+            frobenius-matrix-ops-per-sec: 27584.331585
+            hadamard-matrix-ops-per-sec: 194564.598970
+            identity-matrix-ops-per-sec: 153053.827806
+            mean-matrix-ops-per-sec: 241317.757652
+            mult-matrix-ops-per-sec: 201211.599708
+            negate-matrix-ops-per-sec: 633518.343301
+            prod-matrix-ops-per-sec: 279.911948
+            sub-matrix-ops-per-sec: 110629.091054
+            square-matrix-ops-per-sec: 267.603362
+            trans-matrix-ops-per-sec: 46494.887149
+            zero-matrix-ops-per-sec: 177174.982891
+          - instance: 2
+            bogo-ops: 114208
+            bogo-ops-per-second-usr-sys-time: 3807.552187
+            bogo-ops-per-second-real-time: 1903.380747
+            wall-clock-time: 60.002708
+            user-time: 29.995124
+            system-time: 0.000000
+            cpu-usage: 49.989617
+            max-rss: 2848
+            add-matrix-ops-per-sec: 168567.265218
+            copy-matrix-ops-per-sec: 244869.840499
+            div-matrix-ops-per-sec: 165746.148002
+            frobenius-matrix-ops-per-sec: 33432.929244
+            hadamard-matrix-ops-per-sec: 207213.298807
+            identity-matrix-ops-per-sec: 140760.847071
+            mean-matrix-ops-per-sec: 202983.502690
+            mult-matrix-ops-per-sec: 297882.195494
+            negate-matrix-ops-per-sec: 403546.744725
+            prod-matrix-ops-per-sec: 279.887874
+            sub-matrix-ops-per-sec: 163456.601140
+            square-matrix-ops-per-sec: 271.455951
+            trans-matrix-ops-per-sec: 53154.072560
+            zero-matrix-ops-per-sec: 345386.370756
+          - instance: 3
+            bogo-ops: 113146
+            bogo-ops-per-second-usr-sys-time: 3790.450588
+            bogo-ops-per-second-real-time: 1886.258240
+            wall-clock-time: 59.984364
+            user-time: 29.849289
+            system-time: 0.000988
+            cpu-usage: 49.763430
+            max-rss: 2976
+            add-matrix-ops-per-sec: 130050.199988
+            copy-matrix-ops-per-sec: 415075.242788
+            div-matrix-ops-per-sec: 141274.974069
+            frobenius-matrix-ops-per-sec: 27580.365191
+            hadamard-matrix-ops-per-sec: 469194.509578
+            identity-matrix-ops-per-sec: 209878.802630
+            mean-matrix-ops-per-sec: 249720.910000
+            mult-matrix-ops-per-sec: 403503.927247
+            negate-matrix-ops-per-sec: 297874.051441
+            prod-matrix-ops-per-sec: 276.766628
+            sub-matrix-ops-per-sec: 124452.931129
+            square-matrix-ops-per-sec: 270.353838
+            trans-matrix-ops-per-sec: 39431.175093
+            zero-matrix-ops-per-sec: 337000.582883
+
+...

@@ -1,0 +1,35 @@
+apiVersion: kataconfiguration.openshift.io/v1
+kind: KataConfig
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"kataconfiguration.openshift.io/v1","kind":"KataConfig","metadata":{"annotations":{},"name":"example-kataconfig"},"spec":{"checkNodeEligibility":false,"enablePeerPods":false,"logLevel":"info"}}
+  creationTimestamp: "2026-10-11T08:09:46Z"
+  finalizers:
+  - kataconfiguration.openshift.io/finalizer
+  generation: 2
+  name: example-kataconfig
+  resourceVersion: "211823"
+  uid: fc516b47-8a3e-4fec-a4ee-00a341b65051
+spec:
+  checkNodeEligibility: false
+  enablePeerPods: false
+  kataConfigPoolSelector: null
+  logLevel: info
+status:
+  conditions:
+  - lastTransitionTime: "2026-10-11T08:18:01Z"
+    message: ""
+    reason: ""
+    status: "False"
+    type: InProgress
+  kataNodes:
+    installed:
+    - worker1.okd4.example.com
+    - worker2.okd4.example.com
+    nodeCount: 2
+    readyNodeCount: 2
+  runtimeClasses:
+  - kata
+  - kata-nvidia-gpu
+  waitingForMcoToStart: false

@@ -1,0 +1,5 @@
+cri-o-1.35.9-12.rhaos4.22.git4c168db.el9.x86_64
+kata-containers-3.31.0-5.rhaos4.22.el9.x86_64
+kernel-5.14.0-687.53.1.el9_8.x86_64
+qemu-kvm-core-10.1.0-17.el9_8.5.x86_64
+virtiofsd-1.13.3-1.el9.x86_64

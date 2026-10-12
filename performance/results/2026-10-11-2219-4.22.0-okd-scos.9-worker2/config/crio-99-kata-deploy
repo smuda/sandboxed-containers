@@ -1,0 +1,18 @@
+[crio]
+  storage_option = [
+	"overlay.skip_mount_home=true",
+  ]
+
+[crio.runtime.runtimes.kata-qemu-runtime-rs]
+	runtime_path = "/opt/kata/runtime-rs/bin/containerd-shim-kata-v2"
+	runtime_type = "vm"
+	runtime_root = "/run/vc"
+	runtime_config_path = "/opt/kata/share/defaults/kata-containers/runtime-rs/runtimes/qemu-runtime-rs/configuration-qemu-runtime-rs.toml"
+	privileged_without_host_devices = true
+
+[crio.runtime.runtimes.kata-block-emptydir]
+	runtime_path = "/opt/kata/runtime-rs/bin/containerd-shim-kata-v2"
+	runtime_type = "vm"
+	runtime_root = "/run/vc"
+	runtime_config_path = "/opt/kata/share/defaults/kata-containers/custom-runtimes/kata-block-emptydir/configuration-qemu-runtime-rs.toml"
+	privileged_without_host_devices = true

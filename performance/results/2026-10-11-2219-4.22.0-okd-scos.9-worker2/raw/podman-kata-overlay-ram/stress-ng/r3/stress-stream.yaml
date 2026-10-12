@@ -1,0 +1,106 @@
+---
+build-info:
+      compiler: 'gcc 14.2.0'
+      stdc-version: '199901L'
+      stdc-hosted: '1'
+
+system-info:
+      stress-ng-version: '0.22.01'
+      run-by: 'unknown'
+      date-yyyy-mm-dd: '2026:10:12'
+      time-hh-mm-ss: '01:17:35'
+      epoch-secs: 1791767855
+      hostname: 'bench-podman-kata-overlay-ram-stressng-r3'
+      sysname: 'Linux'
+      nodename: 'bench-podman-kata-overlay-ram-stressng-r3'
+      release: '6.18.35'
+      version: '#1 SMP Tue Sep 15 07:34:33 UTC 2026'
+      machine: 'x86_64'
+      compiler: 'gcc 14.2.0'
+      libc: 'glibc 2.41'
+      uptime: 218
+      totalram: 4158574592
+      freeram: 3859288064
+      sharedram: 159424512
+      bufferram: 1646592
+      totalswap: 0
+      freeswap: 0
+      pagesize: 4096
+      cpus: 5
+      cpus-online: 5
+      ticks-per-second: 100
+
+metrics:
+    - stressor: stream
+      bogo-ops: 11804
+      bogo-ops-per-second-usr-sys-time: 49.227163
+      bogo-ops-per-second-real-time: 196.692936
+      wall-clock-time: 60.012323
+      user-time: 239.622465
+      system-time: 0.163848
+      cpu-usage-per-instance: 99.890448
+      max-rss: 51768
+      mb-per-sec-memory-read-rate: 4755.010334
+      mb-per-sec-memory-write-rate: 3170.006890
+      mflop-per-sec-double-precision-compute-: 415.499143
+      pages-mmapped: 12288.000000
+      percent-pages-swapped: 0.000000
+      instances:
+          - instance: 0
+            bogo-ops: 2955
+            bogo-ops-per-second-usr-sys-time: 49.297214
+            bogo-ops-per-second-real-time: 49.239544
+            wall-clock-time: 60.012742
+            user-time: 59.902581
+            system-time: 0.039954
+            cpu-usage: 99.883014
+            max-rss: 51760
+            mb-per-sec-memory-read-rate: 4761.137206
+            mb-per-sec-memory-write-rate: 3174.091470
+            mflop-per-sec-double-precision-compute-: 416.034517
+            pages-mmapped: 12288.000000
+            percent-pages-swapped: 0.000000
+          - instance: 1
+            bogo-ops: 2936
+            bogo-ops-per-second-usr-sys-time: 49.009020
+            bogo-ops-per-second-real-time: 48.925477
+            wall-clock-time: 60.009635
+            user-time: 59.867395
+            system-time: 0.039944
+            cpu-usage: 99.829534
+            max-rss: 51764
+            mb-per-sec-memory-read-rate: 4730.764894
+            mb-per-sec-memory-write-rate: 3153.843263
+            mflop-per-sec-double-precision-compute-: 413.380544
+            pages-mmapped: 12288.000000
+            percent-pages-swapped: 0.000000
+          - instance: 2
+            bogo-ops: 2957
+            bogo-ops-per-second-usr-sys-time: 49.303956
+            bogo-ops-per-second-real-time: 49.272106
+            wall-clock-time: 60.013672
+            user-time: 59.930930
+            system-time: 0.043974
+            cpu-usage: 99.935402
+            max-rss: 51696
+            mb-per-sec-memory-read-rate: 4764.897639
+            mb-per-sec-memory-write-rate: 3176.598426
+            mflop-per-sec-double-precision-compute-: 416.363109
+            pages-mmapped: 12288.000000
+            percent-pages-swapped: 0.000000
+          - instance: 3
+            bogo-ops: 2956
+            bogo-ops-per-second-usr-sys-time: 49.298271
+            bogo-ops-per-second-real-time: 49.255795
+            wall-clock-time: 60.013243
+            user-time: 59.921559
+            system-time: 0.039976
+            cpu-usage: 99.913838
+            max-rss: 51768
+            mb-per-sec-memory-read-rate: 4763.241599
+            mb-per-sec-memory-write-rate: 3175.494399
+            mflop-per-sec-double-precision-compute-: 416.218402
+            pages-mmapped: 12288.000000
+            percent-pages-swapped: 0.000000
+
+...

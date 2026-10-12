@@ -1,0 +1,9 @@
+[hypervisor.qemu]
+block_device_driver = "virtio-blk-pci"
+block_device_cache_direct = true
+block_device_aio = "native"
+enable_iothreads = true
+indep_iothreads = 1
+
+[runtime]
+emptydir_mode = "block-plain"

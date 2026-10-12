@@ -1,0 +1,14 @@
+# As run 1823: block-plain on the qemu-runtime-rs shim itself, so the
+# default RuntimeClass "kata" that run.sh uses gets it.
+shims:
+  qemu-runtime-rs:
+    dropIn: |
+      [hypervisor.qemu]
+      block_device_driver = "virtio-blk-pci"
+      block_device_cache_direct = true
+      block_device_aio = "native"
+      enable_iothreads = true
+      indep_iothreads = 1
+
+      [runtime]
+      emptydir_mode = "block-plain"

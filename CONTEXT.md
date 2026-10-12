@@ -47,6 +47,12 @@ What the node spends to run a pod, measured from the node: CPU time,
 memory and disk charged to the pod, including kata's own processes.
 _Avoid_: overhead (overhead is footprint kata minus footprint runc)
 
+**OCP**:
+Red Hat OpenShift Container Platform, where kata comes from the
+OpenShift sandboxed containers operator. Contrast OKD, the community
+distribution, where kata comes from kata-deploy.
+_Avoid_: OSC, "OpenShift" on its own (ambiguous with OKD)
+
 ## Relationships
 
 - Every kata measurement has exactly one **Baseline**
